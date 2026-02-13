@@ -1,5 +1,5 @@
 name: secure_chat_app
-description: "A new Flutter project with Firebase and Encryption."
+description: "A secure chat application."
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -10,21 +10,27 @@ dependencies:
   flutter:
     sdk: flutter
   firebase_core: ^3.0.0
-  firebase_auth: ^5.0.0
   cloud_firestore: ^5.0.0
   encrypt: ^5.0.3
   intl: ^0.19.0
+  cupertino_icons: ^1.0.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
-  flutter_launcher_icons: ^0.14.4
+  flutter_launcher_icons: ^0.13.1
 
 flutter_launcher_icons:
-  android: true
+  android: "launcher_icon"
   ios: true
+  # المسار الصحيح حسب رفعتك الأخيرة
   image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#121212"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon/app_icon.png
