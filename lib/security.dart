@@ -1,16 +1,23 @@
-import 'package:encrypt/encrypt.dart';
+import 'package:encrypt/encrypt.dart' as encrypt;
 
-class SecureChat {
-  // مفتاح ثابت (للتجربة) - يجب أن يكون 32 حرفاً
-  static final _key = Key.fromUtf8('my_super_secret_key_32_chars_!!');
-  static final _iv = IV.fromLength(16);
-  static final _encrypter = Encrypter(AES(_key));
+class EncryptionService {
+  // مفتاح تشفير ثابت (يجب تغييره في الإنتاج لزيادة الأمان)
+  final _key = encrypt.Key.fromUtf8('my32lengthsupersecretnooneknows1');
+  final _iv = encrypt.IV.fromLength(16);
 
-  static String encrypt(String text) {
-    return _encrypter.encrypt(text, iv: _iv).base64;
+  String encrypt(String text) {
+    final encrypter = encrypt.Encrypter(encrypt.AES(_key));
+    final encrypted = encrypter.encrypt(text, iv: _iv);
+    return encrypted.base64;
   }
 
-  static String decrypt(String encryptedBase64) {
-    return _encrypter.decrypt64(encryptedBase64, iv: _iv);
+  String decrypt(String encryptedText) {
+    try {
+      final encrypter = encrypt.Encrypter(encrypt.AES(_key));
+      final decrypted = encrypter.decrypt64(encryptedText, iv: _iv);
+      return decrypted;
+    } catch (e) {
+      return "[Error Decrypting]";
+    }
   }
 }
