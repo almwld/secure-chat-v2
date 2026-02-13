@@ -1,19 +1,27 @@
 workflows:
   android-release:
-    name: Secure Chat Final Build
+    name: Secure Chat Icon Build
     instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      flutter: stable
     scripts:
-      - name: Generate Android Folder
+      - name: Setup Project and Android Folder
         script: |
-          # 1. إنشاء المشروع
           flutter create --platforms android --org com.cardiachat --project-name secure_chat_app . 
           
-          # 2. إضافة صلاحية الإنترنت بطريقة متوافقة مع macOS و Linux
-          # نستخدم البحث والاستبدال بدلاً من الإضافة لتجنب أخطاء نظام التشغيل
-          sed -i '' 's|<manifest|<manifest xmlns:android="http://schemas.android.com/apk/res/android"> \n    <uses-permission android:name="android.permission.INTERNET"/>|' android/app/src/main/AndroidManifest.xml
+      - name: Add Internet Permission
+        script: |
+          sed -i '' 's|<manifest|<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET"/>|' android/app/src/main/AndroidManifest.xml
+
+      - name: Generate App Icons
+        script: |
+          flutter pub get
+          dart run flutter_launcher_icons
           
       - name: Build APK
         script: |
           flutter build apk --release --tree-shake-icons
+          
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
