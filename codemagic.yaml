@@ -1,9 +1,14 @@
 workflows:
   android-release:
-    name: Secure Chat Final Build
+    name: Secure Chat Clean Build
     instance_type: mac_mini_m2
     scripts:
+      - name: Generate Android Folder
+        script: |
+          # هذه الخطوة تعوض عدم وجود فلوتر عندك محلياً وتنشئ مجلد أندرويد حديث v2
+          flutter create --platforms android . 
       - name: Build APK
-        script: flutter build apk --release --tree-shake-icons
+        script: |
+          flutter build apk --release --tree-shake-icons
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
