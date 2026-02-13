@@ -1,12 +1,12 @@
 workflows:
   android-release:
-    name: Secure Chat Clean Build
+    name: Secure Chat Final Firebase Build
     instance_type: mac_mini_m2
     scripts:
       - name: Generate Android Folder
         script: |
-          # هذه الخطوة تعوض عدم وجود فلوتر عندك محلياً وتنشئ مجلد أندرويد حديث v2
-          flutter create --platforms android . 
+          # إنشاء المشروع بالهوية الصحيحة ليتوافق مع ملف Firebase
+          flutter create --platforms android --org com.cardiachat --project-name secure_chat_app . 
       - name: Build APK
         script: |
           flutter build apk --release --tree-shake-icons
