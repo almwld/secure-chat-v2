@@ -23,8 +23,7 @@ dev_dependencies:
 
 flutter_launcher_icons:
   android: "launcher_icon"
-  ios: true
-  # المسار الصحيح حسب رفعتك الأخيرة
+  ios: false # تم التغيير إلى false لتعطيل البحث عن مجلدات iOS
   image_path: "assets/icon/app_icon.png"
   min_sdk_android: 21
   adaptive_icon_background: "#121212"
