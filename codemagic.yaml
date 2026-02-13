@@ -1,6 +1,6 @@
 workflows:
   android-release:
-    name: Secure Chat Final Firebase Build
+    name: Secure Chat Final Build
     instance_type: mac_mini_m2
     scripts:
       - name: Generate Android Folder
@@ -8,8 +8,9 @@ workflows:
           # 1. إنشاء المشروع
           flutter create --platforms android --org com.cardiachat --project-name secure_chat_app . 
           
-          # 2. حقن صلاحية الإنترنت داخل ملف AndroidManifest الذي تم إنشاؤه للتو
-          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
+          # 2. إضافة صلاحية الإنترنت بطريقة متوافقة مع macOS و Linux
+          # نستخدم البحث والاستبدال بدلاً من الإضافة لتجنب أخطاء نظام التشغيل
+          sed -i '' 's|<manifest|<manifest xmlns:android="http://schemas.android.com/apk/res/android"> \n    <uses-permission android:name="android.permission.INTERNET"/>|' android/app/src/main/AndroidManifest.xml
           
       - name: Build APK
         script: |
