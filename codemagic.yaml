@@ -6,19 +6,19 @@ workflows:
     environment:
       flutter: stable
     scripts:
-      - name: Setup Project
+      - name: Setup and Clean
         script: |
           flutter create --platforms android --org com.cardiachat --project-name secure_chat_app . 
-          
-      - name: Clean and Get Dependencies
-        script: |
           flutter clean
           flutter pub get
+          
+      - name: Add Internet Permission
+        script: |
+          sed -i '' 's|<manifest|<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET"/>|' android/app/src/main/AndroidManifest.xml
 
       - name: Generate App Icons
         script: |
-          # التأكد من وجود الصورة برمجياً قبل البدء
-          ls -lh assets/icon/app_icon.png
+          flutter pub get
           dart run flutter_launcher_icons
           
       - name: Build APK
