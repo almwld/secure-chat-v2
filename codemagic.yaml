@@ -1,22 +1,20 @@
 workflows:
   android-release:
-    name: Secure Chat Final Icon Build
+    name: Secure Chat Rescue Build
     instance_type: mac_mini_m2
     scripts:
-      - name: Project Reset and Setup
+      - name: Pure Project Setup
         script: |
-          flutter clean
+          rm -rf android # حذف مجلد أندرويد بالكامل لإعادة إنشائه بنظافة
           flutter create --platforms android --org com.cardiachat --project-name secure_chat_app .
           
-          # حقن الصلاحيات
+          # إضافة صلاحية الإنترنت
           sed -i '' 's|<manifest|<manifest xmlns:android="http://schemas.android.com/apk/res/android"> \n    <uses-permission android:name="android.permission.INTERNET"/>|' android/app/src/main/AndroidManifest.xml
           
           flutter pub get
-          # تشغيل أمر الأيقونات لأندرويد فقط
-          dart run flutter_launcher_icons
-          
+          # تخطي الأيقونة مؤقتاً للتأكد من أن الشاشة البيضاء ليست بسببها
       - name: Build APK
         script: |
-          flutter build apk --release --tree-shake-icons
+          flutter build apk --release
     artifacts:
       - build/app/outputs/flutter-apk/*.apk

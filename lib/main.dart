@@ -3,96 +3,55 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'security.dart';
 
-void main() async {
-  // تفعيل الربط مع النظام
+void main() {
+  // 1. ضمان تشغيل محرك فلوتر أولاً
   WidgetsFlutterBinding.ensureInitialized();
   
-  // تشغيل التطبيق فوراً وعدم انتظار Firebase لمنع الشاشة البيضاء
+  // 2. تشغيل الواجهة فوراً دون انتظار أي شيء
   runApp(const MaterialApp(
     debugShowCheckedModeBanner: false,
-    home: ChatScreen(),
+    home: SimpleChat(),
   ));
-
-  // بدء Firebase في الخلفية
-  try {
-    await Firebase.initializeApp();
-  } catch (e) {
-    print("Firebase init error: $e");
-  }
 }
 
-class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+class SimpleChat extends StatefulWidget {
+  const SimpleChat({super.key});
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  State<SimpleChat> createState() => _SimpleChatState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _SimpleChatState extends State<SimpleChat> {
+  bool _isInitialized = false;
   final EncryptionService _enc = EncryptionService();
-  final TextEditingController _con = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // بدء تهيئة فيربيس في الخلفية
+    _initFirebase();
+  }
+
+  void _initFirebase() async {
+    try {
+      await Firebase.initializeApp();
+      setState(() => _isInitialized = true);
+    } catch (e) {
+      debugPrint("Firebase Error: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+      backgroundColor: Colors.black,
       appBar: AppBar(
         title: const Text("CardiaChat ✅"),
-        backgroundColor: const Color(0xFF1F1F1F),
+        backgroundColor: Colors.blueGrey[900],
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('messages').orderBy('createdAt', descending: true).snapshots(),
-              builder: (context, snap) {
-                if (!snap.hasData) return const Center(child: CircularProgressIndicator());
-                return ListView.builder(
-                  reverse: true,
-                  itemCount: snap.data!.docs.length,
-                  itemBuilder: (context, i) {
-                    var data = snap.data!.docs[i];
-                    return ListTile(
-                      title: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.blueGrey[900],
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(_enc.decrypt(data['text'] ?? ""), style: const TextStyle(color: Colors.white)),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          _buildInputArea(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInputArea() {
-    return Container(
-      padding: const EdgeInsets.all(8.0),
-      color: const Color(0xFF1F1F1F),
-      child: Row(
-        children: [
-          Expanded(child: TextField(controller: _con, style: const TextStyle(color: Colors.white))),
-          IconButton(icon: const Icon(Icons.send, color: Colors.blue), onPressed: () {
-            if(_con.text.isNotEmpty) {
-              FirebaseFirestore.instance.collection('messages').add({
-                'text': _enc.encrypt(_con.text),
-                'createdAt': FieldValue.serverTimestamp(),
-                'senderId': 'User_A'
-              });
-              _con.clear();
-            }
-          }),
-        ],
+      body: Center(
+        child: _isInitialized 
+          ? const Text("Connected & Secure", style: TextStyle(color: Colors.green))
+          : const CircularProgressIndicator(),
       ),
     );
   }
