@@ -5,8 +5,12 @@ workflows:
     scripts:
       - name: Generate Android Folder
         script: |
-          # إنشاء المشروع بالهوية الصحيحة ليتوافق مع ملف Firebase
+          # 1. إنشاء المشروع
           flutter create --platforms android --org com.cardiachat --project-name secure_chat_app . 
+          
+          # 2. حقن صلاحية الإنترنت داخل ملف AndroidManifest الذي تم إنشاؤه للتو
+          sed -i '/<manifest/a \    <uses-permission android:name="android.permission.INTERNET"/>' android/app/src/main/AndroidManifest.xml
+          
       - name: Build APK
         script: |
           flutter build apk --release --tree-shake-icons
