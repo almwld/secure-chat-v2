@@ -6,7 +6,14 @@ import 'security.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  
+  // تشغيل Firebase في الخلفية دون انتظار (Non-blocking)
+  Firebase.initializeApp().then((_) {
+    print("Firebase Connected!");
+  }).catchError((e) {
+    print("Offline Mode: $e");
+  });
+
   runApp(const SecureChatApp());
 }
 
@@ -16,12 +23,7 @@ class SecureChatApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: const Color(0xFF1E88E5),
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        useMaterial3: true,
-      ),
+      theme: ThemeData.dark(useMaterial3: true),
       home: const ChatScreen(),
     );
   }
@@ -37,12 +39,14 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final EncryptionService _encryption = EncryptionService();
-  final String currentUserId = "User_A"; // سنقوم ببرمجة تسجيل الدخول لاحقاً
+  final String currentUserId = "User_A";
 
   void _sendMessage() async {
     if (_controller.text.trim().isNotEmpty) {
       String encryptedText = _encryption.encrypt(_controller.text);
-      await _firestore.collection('messages').add({
+      
+      // Firestore يحفظ البيانات محلياً ويرسلها تلقائياً عند عودة الإنترنت
+      _firestore.collection('messages').add({
         'text': encryptedText,
         'createdAt': FieldValue.serverTimestamp(),
         'senderId': currentUserId,
@@ -55,10 +59,8 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('🔐 CardiaChat Secure'),
-        centerTitle: true,
+        title: const Text('🔐 CardiaChat (Offline Ready)'),
         backgroundColor: const Color(0xFF1F1F1F),
-        elevation: 2,
       ),
       body: Column(
         children: [
@@ -66,40 +68,28 @@ class _ChatScreenState extends State<ChatScreen> {
             child: StreamBuilder<QuerySnapshot>(
               stream: _firestore.collection('messages').orderBy('createdAt', descending: true).snapshots(),
               builder: (context, snapshot) {
-                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                // حتى لو لم تكتمل البيانات من السحاب، سيعرض ما هو مخزن محلياً
+                if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                  return const Center(child: Text("Connecting..."));
+                }
                 
                 return ListView.builder(
                   reverse: true,
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
-                  itemCount: snapshot.data!.docs.length,
+                  itemCount: snapshot.data?.docs.length ?? 0,
                   itemBuilder: (context, index) {
                     var doc = snapshot.data!.docs[index];
                     bool isMe = doc['senderId'] == currentUserId;
                     String decryptedText = _encryption.decrypt(doc['text']);
-                    DateTime? date = (doc['createdAt'] as Timestamp?)?.toDate();
-                    String time = date != null ? DateFormat('hh:mm a').format(date) : "...";
-
-                    return Align(
-                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 5),
-                        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: isMe ? const Color(0xFF0D47A1) : const Color(0xFF424242),
-                          borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(15),
-                            topRight: const Radius.circular(15),
-                            bottomLeft: isMe ? const Radius.circular(15) : Radius.zero,
-                            bottomRight: isMe ? Radius.zero : const Radius.circular(15),
+                    return ListTile(
+                      title: Align(
+                        alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isMe ? Colors.blue[900] : Colors.grey[800],
+                            borderRadius: BorderRadius.circular(15),
                           ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                          children: [
-                            Text(decryptedText, style: const TextStyle(color: Colors.white, fontSize: 16)),
-                            const SizedBox(height: 5),
-                            Text(time, style: const TextStyle(color: Colors.white70, fontSize: 10)),
-                          ],
+                          child: Text(decryptedText),
                         ),
                       ),
                     );
@@ -117,26 +107,16 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildInputArea() {
     return Container(
       padding: const EdgeInsets.all(10),
-      decoration: const BoxDecoration(color: Color(0xFF1F1F1F)),
+      color: const Color(0xFF1F1F1F),
       child: Row(
         children: [
           Expanded(
             child: TextField(
               controller: _controller,
-              decoration: InputDecoration(
-                hintText: 'Type a secure message...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide.none),
-                filled: true,
-                fillColor: const Color(0xFF2C2C2C),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-              ),
+              decoration: const InputDecoration(hintText: 'Type a message...'),
             ),
           ),
-          const SizedBox(width: 10),
-          CircleAvatar(
-            backgroundColor: const Color(0xFF1E88E5),
-            child: IconButton(icon: const Icon(Icons.send, color: Colors.white), onPressed: _sendMessage),
-          ),
+          IconButton(icon: const Icon(Icons.send), onPressed: _sendMessage),
         ],
       ),
     );
