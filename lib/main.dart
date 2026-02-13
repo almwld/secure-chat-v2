@@ -5,14 +5,13 @@ import 'security.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // تشغيل الواجهة أولاً لضمان عدم ظهور شاشة بيضاء
+  // لا ننتظر أحداً.. اظهر الآن!
   runApp(const CardiaControlApp());
   
-  // تهيئة النظام في الخلفية
   try {
     await Firebase.initializeApp();
   } catch (e) {
-    debugPrint("Init Error: $e");
+    debugPrint("Firebase not ready yet");
   }
 }
 
@@ -23,7 +22,7 @@ class CardiaControlApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0A0A0A),
+        scaffoldBackgroundColor: Colors.black,
         primaryColor: Colors.blueAccent,
       ),
       home: const MainControlScreen(),
@@ -31,121 +30,60 @@ class CardiaControlApp extends StatelessWidget {
   }
 }
 
-class MainControlScreen extends StatefulWidget {
+class MainControlScreen extends StatelessWidget {
   const MainControlScreen({super.key});
-  @override
-  State<MainControlScreen> createState() => _MainControlScreenState();
-}
-
-class _MainControlScreenState extends State<MainControlScreen> {
-  final TextEditingController _msgController = TextEditingController();
-  final EncryptionService _encryption = EncryptionService();
-  bool _isReady = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // فحص الجاهزية للربط مع فيربيس
-    Future.delayed(const Duration(seconds: 2), () {
-      setState(() => _isReady = true);
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("🔐 Cardia Central Control"),
+        title: const Text("CardiaChat ✅", style: TextStyle(color: Colors.greenAccent)),
         centerTitle: true,
-        backgroundColor: const Color(0xFF1A1A1A),
-        actions: [
-          Icon(Icons.circle, color: _isReady ? Colors.green : Colors.red, size: 12),
-          const SizedBox(width: 15),
-        ],
+        backgroundColor: const Color(0xFF121212),
+        elevation: 0,
       ),
-      body: _isReady ? _buildChatInterface() : _buildLoadingScreen(),
-    );
-  }
-
-  Widget _buildLoadingScreen() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainCenterAxisAlignment.center,
+      body: Column(
         children: [
-          CircularProgressIndicator(color: Colors.blueAccent),
-          SizedBox(height: 20),
-          Text("Initializing System Control...", style: TextStyle(color: Colors.grey)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChatInterface() {
-    return Column(
-      children: [
-        Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('messages').orderBy('createdAt', descending: true).snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const Center(child: Text("Waiting for data..."));
-              
-              return ListView.builder(
-                reverse: true,
-                itemCount: snapshot.data!.docs.length,
-                itemBuilder: (context, index) {
-                  var doc = snapshot.data!.docs[index];
-                  String decrypted = _encryption.decrypt(doc['text'] ?? "");
-                  bool isMe = doc['senderId'] == "Admin";
-
-                  return Align(
-                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: isMe ? Colors.blue[900] : Colors.grey[850],
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      child: Text(decrypted),
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-        ),
-        _inputBar(),
-      ],
-    );
-  }
-
-  Widget _inputBar() {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      color: const Color(0xFF1A1A1A),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _msgController,
-              decoration: const InputDecoration(hintText: "Enter secure command...", border: InputBorder.none),
+          const Expanded(
+            child: Center(
+              child: Text(
+                "System Online\nReady for Secure Commands",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.blueGrey, fontSize: 18),
+              ),
             ),
           ),
-          IconButton(
-            icon: const Icon(Icons.send, color: Colors.blueAccent),
-            onPressed: () {
-              if (_msgController.text.isNotEmpty) {
-                FirebaseFirestore.instance.collection('messages').add({
-                  'text': _encryption.encrypt(_msgController.text),
-                  'senderId': "Admin",
-                  'createdAt': FieldValue.serverTimestamp(),
-                });
-                _msgController.clear();
-              }
-            },
-          ),
+          _buildQuickActions(),
         ],
       ),
+    );
+  }
+
+  Widget _buildQuickActions() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1A1A1A),
+        borderRadius: BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _actionBtn(Icons.message, "Chat"),
+          _actionBtn(Icons.security, "Encrypt"),
+          _actionBtn(Icons.settings, "Control"),
+        ],
+      ),
+    );
+  }
+
+  Widget _actionBtn(IconData icon, String label) {
+    return Column(
+      children: [
+        CircleAvatar(backgroundColor: Colors.blueAccent.withOpacity(0.1), child: Icon(icon, color: Colors.blueAccent)),
+        const SizedBox(height: 5),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+      ],
     );
   }
 }
