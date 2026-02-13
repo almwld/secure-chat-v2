@@ -1,20 +1,21 @@
 workflows:
   android-release:
-    name: Secure Chat Final Icon Build
+    name: Secure Chat Final Fix
     instance_type: mac_mini_m2
     scripts:
-      - name: Fetch and Generate
+      - name: Project Reset and Setup
         script: |
-          # التأكد من جلب الملفات المرفوعة يدوياً
-          git pull origin main
+          # تنظيف أي مخلفات بناء سابقة
+          flutter clean
           
           # إنشاء مجلد أندرويد
-          flutter create --platforms android --org com.cardiachat --project-name secure_chat_app . 
+          flutter create --platforms android --org com.cardiachat --project-name secure_chat_app .
           
-          # حقن صلاحية الإنترنت
+          # حقن الصلاحيات
           sed -i '' 's|<manifest|<manifest xmlns:android="http://schemas.android.com/apk/res/android"> \n    <uses-permission android:name="android.permission.INTERNET"/>|' android/app/src/main/AndroidManifest.xml
           
-          # توليد الأيقونات
+          # تثبيت المكتبات وتوليد الأيقونة
+          flutter pub get
           dart run flutter_launcher_icons
           
       - name: Build APK
