@@ -10,7 +10,7 @@ void main() async {
   try {
     await Firebase.initializeApp();
   } catch (e) {
-    debugPrint("Firebase connection error: $e");
+    debugPrint("System: Waiting for Sync...");
   }
 }
 
@@ -20,23 +20,19 @@ class CardiaUltimateApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF080808),
-        primaryColor: Colors.blueAccent,
-      ),
-      home: const MainControlPage(),
+      theme: ThemeData.dark(),
+      home: const ChatWallpaperScreen(),
     );
   }
 }
 
-class MainControlPage extends StatefulWidget {
-  const MainControlPage({super.key});
+class ChatWallpaperScreen extends StatefulWidget {
+  const ChatWallpaperScreen({super.key});
   @override
-  State<MainControlPage> createState() => _MainControlPageState();
+  State<ChatWallpaperScreen> createState() => _ChatWallpaperScreenState();
 }
 
-class _MainControlPageState extends State<MainControlPage> {
-  int _selectedIndex = 0;
+class _ChatWallpaperScreenState extends State<ChatWallpaperScreen> {
   final EncryptionService _encryption = EncryptionService();
   final TextEditingController _controller = TextEditingController();
 
@@ -45,160 +41,136 @@ class _MainControlPageState extends State<MainControlPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // خلفية بتدرج نيون خافت
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF0D1B2A), Color(0xFF000000)],
+          // 1. طبقة الخلفية (صورة أو تدرج نيون)
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFF001219), Color(0xFF005F73), Color(0xFF001219)],
+                ),
+              ),
+              // يمكنك لاحقاً إضافة صورة حقيقية هنا باستخدام Image.network
+            ),
+          ),
+          
+          // 2. المحتوى الرئيسي مع تأثير الزجاج
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  _buildNeonHeader(),
+                  Expanded(child: _buildMessagesArea()),
+                  _buildModernInput(),
+                ],
               ),
             ),
           ),
-          SafeArea(
-            child: Column(
-              children: [
-                _buildTopBar(),
-                Expanded(child: _selectedIndex == 0 ? _buildChatView() : _buildPlaceholder()),
-                _buildGlassBottomNav(),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildNeonHeader() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text("CardiaChat PRO", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 1)),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(color: Colors.greenAccent.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-            child: const Text("ONLINE", style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+          const CircleAvatar(
+            backgroundColor: Colors.cyanAccent,
+            child: Icon(Icons.shield, color: Colors.black),
           ),
+          const SizedBox(width: 15),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("CARDIA PRO", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 2, color: Colors.cyanAccent)),
+              Text("ENCRYPTED NODE: 04-X", style: TextStyle(fontSize: 9, color: Colors.white54)),
+            ],
+          ),
+          const Spacer(),
+          IconButton(icon: const Icon(Icons.more_vert, color: Colors.white), onPressed: () {}),
         ],
       ),
     );
   }
 
-  Widget _buildChatView() {
-    return Column(
-      children: [
-        Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('messages').orderBy('createdAt', descending: true).snapshots(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-              return ListView.builder(
-                reverse: true,
-                padding: const EdgeInsets.all(15),
-                itemCount: snapshot.data!.docs.length,
-                itemBuilder: (context, index) {
-                  var doc = snapshot.data!.docs[index];
-                  bool isMe = doc['senderId'] == "Admin";
-                  String msg = _encryption.decrypt(doc['text'] ?? "");
-                  return _bubble(msg, isMe);
-                },
-              );
-            },
-          ),
-        ),
-        _buildInputArea(),
-      ],
+  Widget _buildMessagesArea() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('messages').orderBy('createdAt', descending: true).snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Colors.cyanAccent));
+        return ListView.builder(
+          reverse: true,
+          itemCount: snapshot.data!.docs.length,
+          itemBuilder: (context, index) {
+            var doc = snapshot.data!.docs[index];
+            bool isMe = doc['senderId'] == "Admin";
+            String msg = _encryption.decrypt(doc['text'] ?? "");
+            return _chatBubble(msg, isMe);
+          },
+        );
+      },
     );
   }
 
-  Widget _bubble(String text, bool isMe) {
+  Widget _chatBubble(String text, bool isMe) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 5),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+        padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: isMe ? Colors.blueAccent : Colors.white.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(20).copyWith(
-            bottomRight: isMe ? Radius.zero : const Radius.circular(20),
-            bottomLeft: isMe ? const Radius.circular(20) : Radius.zero,
-          ),
+          color: isMe ? Colors.cyanAccent.withOpacity(0.15) : Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isMe ? Colors.cyanAccent.withOpacity(0.5) : Colors.white10),
+          boxShadow: isMe ? [BoxShadow(color: Colors.cyanAccent.withOpacity(0.1), blurRadius: 10)] : [],
         ),
         child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 16)),
       ),
     );
   }
 
-  Widget _buildInputArea() {
+  Widget _buildModernInput() {
     return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.03)),
+      padding: const EdgeInsets.all(20),
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: _controller,
-              decoration: InputDecoration(
-                hintText: "Enter secure message...",
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  color: Colors.white.withOpacity(0.05),
+                  child: TextField(
+                    controller: _controller,
+                    decoration: const InputDecoration(hintText: "Secure transmission...", border: InputBorder.none),
+                  ),
+                ),
               ),
             ),
           ),
           const SizedBox(width: 10),
-          CircleAvatar(
-            backgroundColor: Colors.blueAccent,
-            child: IconButton(
-              icon: const Icon(Icons.send_rounded, color: Colors.white),
-              onPressed: () {
-                if (_controller.text.isNotEmpty) {
-                  FirebaseFirestore.instance.collection('messages').add({
-                    'text': _encryption.encrypt(_controller.text),
-                    'senderId': "Admin",
-                    'createdAt': FieldValue.serverTimestamp(),
-                  });
-                  _controller.clear();
-                }
-              },
-            ),
+          FloatingActionButton.small(
+            backgroundColor: Colors.cyanAccent,
+            onPressed: () {
+              if (_controller.text.isNotEmpty) {
+                FirebaseFirestore.instance.collection('messages').add({
+                  'text': _encryption.encrypt(_controller.text),
+                  'senderId': "Admin",
+                  'createdAt': FieldValue.serverTimestamp(),
+                });
+                _controller.clear();
+              }
+            },
+            child: const Icon(Icons.bolt, color: Colors.black),
           ),
         ],
       ),
     );
-  }
-
-  Widget _buildGlassBottomNav() {
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          height: 70,
-          color: Colors.white.withOpacity(0.05),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _navItem(Icons.chat_bubble_outline, 0),
-              _navItem(Icons.security_outlined, 1),
-              _navItem(Icons.settings_outlined, 2),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _navItem(IconData icon, int index) {
-    bool isSelected = _selectedIndex == index;
-    return IconButton(
-      icon: Icon(icon, color: isSelected ? Colors.blueAccent : Colors.grey, size: 28),
-      onPressed: () => setState(() => _selectedIndex = index),
-    );
-  }
-
-  Widget _buildPlaceholder() {
-    return const Center(child: Text("Feature Locked - Encryption Active", style: TextStyle(color: Colors.grey)));
   }
 }
