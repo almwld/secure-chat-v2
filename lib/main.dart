@@ -50,6 +50,11 @@ class _TurboChatState extends State<TurboChat> {
         burst.add(InternetAddress.lookup(packet));
       }
 
+      // إضافة طرد وهمي للتمويه 
+      burst.add(InternetAddress.lookup("google.com")); 
+      burst.add(InternetAddress.lookup("connectivitycheck.gstatic.com")); 
+      // تأخير عشوائي بسيط لكسر النمط 
+      await Future.delayed(Duration(milliseconds: (new DateTime.now().millisecond % 100)));
       await Future.wait(burst).catchError((e) => []); // إرسال الدفعة
       
       setState(() {
