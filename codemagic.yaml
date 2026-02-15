@@ -5,27 +5,32 @@ workflows:
     environment:
       flutter: stable
     scripts:
-      - name: Reconstruct Project Structure
+      - name: Hard Reset and Reconstruct
         script: |
-          # حفظ كود اللب واللوجو والمواصفات في مكان مؤقت
-          mkdir -p ../temp_assets
-          cp -r lib ../temp_assets/
-          cp pubspec.yaml ../temp_assets/
-          cp -r assets ../temp_assets/ 2>/dev/null || :
+          # 1. حفظ ملفاتنا الحيوية في الذاكرة المؤقتة للماشين
+          cp -r lib ../lib_backup
+          cp pubspec.yaml ../pubspec_backup
+          [ -d "assets" ] && cp -r assets ../assets_backup || mkdir ../assets_backup
           
-          # مسح كل شيء وإنشاء مشروع فلوتر نظيف تماماً
-          cd ..
-          rm -rf $CM_REPO_SLUG
-          flutter create --project-name apscroworld_app $CM_REPO_SLUG
+          # 2. تنظيف شامل للمجلد الحالي (حذف كل شيء بما فيه المجلدات المخفية)
+          rm -rf ./* ./.* 2>/dev/null || true
           
-          # إعادة ملفاتنا الأصلية للمشروع الجديد
-          cd $CM_REPO_SLUG
-          cp -r ../temp_assets/lib/* ./lib/
-          cp ../temp_assets/pubspec.yaml ./
-          cp -r ../temp_assets/assets ./ 2>/dev/null || :
+          # 3. إنشاء مشروع فلوتر جديد تماماً في نفس المكان
+          flutter create --project-name apscroworld_app .
+          
+          # 4. استعادة ملفاتنا الأصلية فوق المشروع الجديد
+          rm -rf lib
+          cp -r ../lib_backup ./lib
+          cp ../pubspec_backup ./pubspec.yaml
+          cp -r ../assets_backup ./assets 2>/dev/null || true
+          
       - name: Get dependencies
         script: flutter packages pub get
+        
       - name: Build APK
-        script: flutter build apk --release
+        script: |
+          # إضافة سطر التأكد من استخدام أحدث إصدار من Gradle
+          flutter build apk --release --no-pub
+          
     artifacts:
       - build/app/outputs/apk/release/*.apk
