@@ -97,7 +97,7 @@ class _CyberChatState extends State<CyberChat> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text("CARDIA CORE", style: TextStyle(fontSize: 14, color: Colors.cyanAccent)),
-            Text("LINK: $_tunnelStatus", style: TextStyle(fontSize: 9, color: Colors.white38)),
+            Text("LINK: $_tunnelStatus | KEY: ACTIVE", style: TextStyle(fontSize: 9, color: Colors.white38)),
           ],
         ),
         actions: [

@@ -1,41 +1,41 @@
-import 'package:encrypt/encrypt.dart';
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
+import 'package:intl/intl.dart';
 
 class EncryptionService {
-  final Key _key = Key.fromUtf8('c4rdia_secure_cloak_key_32bit!!!');
-  final IV _iv = IV.fromLength(16);
+  // توليد مفتاح يتغير كل ساعة بناءً على التاريخ والوقت
+  String _generateDynamicKey() {
+    String timeSeed = DateFormat('yyyy-MM-dd-HH').format(DateTime.now());
+    var bytes = utf8.encode(timeSeed + "CARDIA_SALT_2026"); 
+    return sha256.convert(bytes).toString().substring(0, 32);
+  }
 
-  // قائمة جمل التمويه
-  final List<String> _covers = [
-    "الجو غائم اليوم بشكل غريب",
-    "تأكد من إغلاق النوافذ جيداً",
-    "المباراة كانت ممتعة جداً أمس",
-    "سأتصل بك عندما أصل للمنزل",
-    "هل تذكر أين وضعنا الكتاب؟",
-    "قائمة الطلبات: حليب، خبز، وماء"
-  ];
-
-  String encrypt(String text) {
-    if (text.isEmpty) return "";
-    final encrypter = Encrypter(AES(_key));
-    String secret = encrypter.encrypt(text, iv: _iv).base64;
+  String encrypt(String plainText) {
+    String key = _generateDynamicKey();
+    // تشفير XOR بسيط مع المفتاح الديناميكي لضمان السرعة عبر النفق
+    List<int> plainBytes = utf8.encode(plainText);
+    List<int> keyBytes = utf8.encode(key);
+    List<int> encrypted = [];
     
-    // اختيار جملة عشوائية للتمويه وإضافة السر بعدها بمسافات خفية
-    String cover = (_covers..shuffle()).first;
-    return "$cover |$secret"; // السر يوضع بعد علامة الفاصلة
-  }
-
-  String decrypt(String fullText) {
-    try {
-      if (!fullText.contains('|')) return fullText;
-      String secret = fullText.split('|')[1].trim();
-      final encrypter = Encrypter(AES(_key));
-      return encrypter.decrypt64(secret, iv: _iv);
-    } catch (e) {
-      return fullText.split('|')[0]; // إذا فشل فك التشفير، يظهر النص العادي فقط
+    for (int i = 0; i < plainBytes.length; i++) {
+      encrypted.add(plainBytes[i] ^ keyBytes[i % keyBytes.length]);
     }
+    return base64Url.encode(encrypted);
   }
 
-  String getCoverOnly(String fullText) {
-    return fullText.contains('|') ? fullText.split('|')[0] : fullText;
+  String decrypt(String encryptedText) {
+    try {
+      String key = _generateDynamicKey();
+      List<int> encryptedBytes = base64Url.decode(encryptedText);
+      List<int> keyBytes = utf8.encode(key);
+      List<int> decrypted = [];
+      
+      for (int i = 0; i < encryptedBytes.length; i++) {
+        decrypted.add(encryptedBytes[i] ^ keyBytes[i % keyBytes.length]);
+      }
+      return utf8.decode(decrypted);
+    } catch (e) {
+      return "[!] Decryption Error: Key Mismatch";
+    }
   }
 }
