@@ -1,99 +1,127 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'security.dart';
 import 'storage.dart';
-import 'browser_engine.dart';
 
-void main() => runApp(const CardiaUltimateOS());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(statusBarColor: Colors.transparent));
+  runApp(const CardiaMasterpiece());
+}
 
-class CardiaUltimateOS extends StatelessWidget {
-  const CardiaUltimateOS({super.key});
+class CardiaMasterpiece extends StatelessWidget {
+  const CardiaMasterpiece({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: const Color(0xFF00050A)),
-      home: const HomeScreen(),
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF00080F),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.cyanAccent, brightness: Brightness.dark),
+      ),
+      home: const MainVault(),
     );
   }
 }
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+class MainVault extends StatefulWidget {
+  const MainVault({super.key});
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<MainVault> createState() => _MainVaultState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
-  final List<Widget> _pages = [const ChatPage(), const GhostBrowserPage()];
-
+class _MainVaultState extends State<MainVault> with SingleTickerProviderStateMixin {
+  bool _isTurbo = false;
+  final TextEditingController _controller = TextEditingController();
+  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        selectedItemColor: Colors.cyanAccent,
-        onTap: (index) => setState(() => _currentIndex = index),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.chat), label: "Vault Chat"),
-          BottomNavigationBarItem(icon: Icon(Icons.public), label: "Ghost Web"),
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        title: Row(
+          children: [
+            _buildStatusNode(),
+            const SizedBox(width: 10),
+            const Text("CARDIA ULTIMATE", style: TextStyle(letterSpacing: 2, fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        actions: [
+          IconButton(icon: Icon(_isTurbo ? Icons.bolt : Icons.shutter_speed, color: _isTurbo ? Colors.magentaAccent : Colors.cyanAccent), 
+          onPressed: () => setState(() => _isTurbo = !_isTurbo)),
         ],
       ),
-    );
-  }
-}
-
-// صفحة متصفح الشبح
-class GhostBrowserPage extends StatefulWidget {
-  const GhostBrowserPage({super.key});
-  @override
-  State<GhostBrowserPage> createState() => _GhostBrowserPageState();
-}
-
-class _GhostBrowserPageState extends State<GhostBrowserPage> {
-  final GhostBrowser _browser = GhostBrowser();
-  final TextEditingController _urlCon = TextEditingController();
-  String _pageContent = "Search the web via DNS Tunnel...";
-  bool _isLoading = false;
-
-  _search() async {
-    setState(() => _isLoading = true);
-    final res = await _browser.fetchText(_urlCon.text);
-    setState(() {
-      _pageContent = res;
-      _isLoading = false;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("GHOST BROWSER", style: TextStyle(fontSize: 14))),
-      body: Column(
-        children: [
-          if (_isLoading) const LinearProgressIndicator(color: Colors.magentaAccent),
-          Padding(
-            padding: const EdgeInsets.all(10),
-            child: TextField(
-              controller: _urlCon,
-              decoration: InputDecoration(
-                hintText: "Enter URL (e.g. google.com)",
-                suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: _search),
-                border: const OutlineInputBorder(),
-              ),
-            ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment.topLeft,
+            radius: 1.5,
+            colors: [
+              _isTurbo ? Colors.magentaAccent.withOpacity(0.05) : Colors.cyanAccent.withOpacity(0.05),
+              Colors.transparent,
+            ],
           ),
-          Expanded(child: SingleChildScrollView(child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Text(_pageContent, style: const TextStyle(fontFamily: 'monospace', color: Colors.greenAccent)),
-          ))),
-        ],
+        ),
+        child: Column(
+          children: [
+            Expanded(child: _buildMessageList()),
+            _buildInputSection(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusNode() {
+    return Container(
+      width: 10, height: 10,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: _isTurbo ? Colors.magentaAccent : Colors.cyanAccent,
+        boxShadow: [BoxShadow(color: _isTurbo ? Colors.magentaAccent : Colors.cyanAccent, blurRadius: 10)],
+      ),
+    );
+  }
+
+  Widget _buildMessageList() {
+    return ListView.builder(
+      padding: const EdgeInsets.all(20),
+      itemBuilder: (context, i) => _chatBubble("Sample Message", true),
+      itemCount: 5,
+    );
+  }
+
+  Widget _chatBubble(String text, bool isMe) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 15),
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.03),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Text(text),
+      ),
+    );
+  }
+
+  Widget _buildInputSection() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: TextField(
+        controller: _controller,
+        decoration: InputDecoration(
+          hintText: "SECURE TRANSMISSION...",
+          fillColor: Colors.white.withOpacity(0.02),
+          filled: true,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+          suffixIcon: const Icon(Icons.send, color: Colors.cyanAccent),
+        ),
       ),
     );
   }
 }
-
-// (صفحة الدردشة ChatPage تبقى كما هي في الكود السابق)
-class ChatPage extends StatelessWidget { const ChatPage({super.key}); @override Widget build(BuildContext context) { return const Center(child: Text("Vault Chat Interface Active")); } }
