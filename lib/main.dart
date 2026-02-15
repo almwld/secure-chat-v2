@@ -1,94 +1,86 @@
 import 'package:flutter/material.dart';
-import 'package:record/record.dart'; // ستحتاج لإضافتها في pubspec
 import 'dart:io';
-import 'dart:convert';
+import 'dart:async';
 import 'security.dart';
 
-void main() => runApp(const CardiaVoiceTunnelApp());
+void main() => runApp(const CardiaTurboApp());
 
-class CardiaVoiceTunnelApp extends StatelessWidget {
-  const CardiaVoiceTunnelApp({super.key});
+class CardiaTurboApp extends StatelessWidget {
+  const CardiaTurboApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: const Color(0xFF00050A)),
-      home: const CyberVoiceChat(),
+      home: const TurboChat(),
     );
   }
 }
 
-class CyberVoiceChat extends StatefulWidget {
-  const CyberVoiceChat({super.key});
+class TurboChat extends StatefulWidget {
+  const TurboChat({super.key});
   @override
-  State<CyberVoiceChat> createState() => _CyberVoiceChatState();
+  State<TurboChat> createState() => _TurboChatState();
 }
 
-class _CyberVoiceChatState extends State<CyberVoiceChat> {
-  final AudioRecorder _recorder = AudioRecorder();
+class _TurboChatState extends State<TurboChat> {
   final EncryptionService _enc = EncryptionService();
-  bool _isRecording = false;
-  bool _isTunneling = true;
+  String _status = "READY";
+  double _speed = 0.0;
 
-  // تسجيل وتشفير وإرسال الصوت عبر النفق
-  Future<void> _handleVoice() async {
-    if (await _recorder.hasPermission()) {
-      if (!_isRecording) {
-        final path = '${Directory.systemTemp.path}/v_cloak.m4a';
-        await _recorder.start(const RecordConfig(), path: path);
-        setState(() => _isRecording = true);
-      } else {
-        final path = await _recorder.stop();
-        setState(() => _isRecording = false);
-        
-        if (path != null) {
-          File file = File(path);
-          List<int> audioBytes = await file.readAsBytes();
-          String encodedAudio = base64Encode(audioBytes);
-          
-          // إرسال أول 100 حرف كمثال على النفق (الهروب الصوتي)
-          _sendAudioChunks(encodedAudio);
-        }
+  // محرك الإرسال المتوازي (التوربو)
+  Future<void> _sendTurbo(String largeData) async {
+    int chunkSize = 45;
+    List<String> chunks = [];
+    
+    // 1. تقطيع البيانات
+    for (var i = 0; i < largeData.length; i += chunkSize) {
+      chunks.add(largeData.substring(i, i + chunkSize > largeData.length ? largeData.length : i + chunkSize));
+    }
+
+    setState(() => _status = "BURSTING...");
+
+    // 2. إرسال 10 طرود في آن واحد (Parallel Burst)
+    for (var i = 0; i < chunks.length; i += 10) {
+      int end = (i + 10 < chunks.length) ? i + 10 : chunks.length;
+      List<Future> burst = [];
+      
+      for (var j = i; j < end; j++) {
+        String packet = "${j}_${_enc.encrypt(chunks[j])}.t.local";
+        burst.add(InternetAddress.lookup(packet));
       }
-    }
-  }
 
-  Future<void> _sendAudioChunks(String data) async {
-    int chunkSize = 40;
-    // سنرسل عينات فقط لأن الصوت الكامل يحتاج آلاف الطلبات
-    for (int i = 0; i < 5; i++) {
-      String chunk = data.substring(i * chunkSize, (i + 1) * chunkSize);
-      try {
-        await InternetAddress.lookup("${i}_voice_${_enc.encrypt(chunk)}.dns.local");
-      } catch (e) {}
+      await Future.wait(burst).catchError((e) => []); // إرسال الدفعة
+      
+      setState(() {
+        _speed = (i / chunks.length);
+      });
     }
-    _showStatus("Voice Stream Relayed via DNS");
-  }
 
-  void _showStatus(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.magentaAccent));
+    setState(() {
+      _status = "FINISHED";
+      _speed = 0.0;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("VOICE TUNNEL ACTIVE")),
+      appBar: AppBar(title: Text("TURBO TUNNEL: $_status"), backgroundColor: Colors.black),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(_isRecording ? Icons.settings_voice : Icons.mic_none, 
-                 size: 80, color: _isRecording ? Colors.redAccent : Colors.cyanAccent),
-            const SizedBox(height: 20),
-            Text(_isRecording ? "RECORDING & ENCRYPTING..." : "HOLD TO SEND SECURE VOICE"),
+            if (_speed > 0) CircularProgressIndicator(value: _speed, color: Colors.cyanAccent, strokeWidth: 10),
+            const SizedBox(height: 30),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.bolt),
+              label: const Text("FAST SEND (10x Speed)"),
+              onPressed: () => _sendTurbo("TEST_DATA_STREAM_MAX_SPEED_V2_2026"),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent, foregroundColor: Colors.black),
+            )
           ],
         ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: FloatingActionButton.large(
-        backgroundColor: _isRecording ? Colors.redAccent : Colors.cyanAccent,
-        onPressed: _handleVoice,
-        child: Icon(_isRecording ? Icons.stop : Icons.mic, color: Colors.black),
       ),
     );
   }
