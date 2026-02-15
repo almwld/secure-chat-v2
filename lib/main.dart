@@ -1,93 +1,151 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'dart:ui';
+import 'package:intl/intl.dart';
+import 'security.dart';
 
 void main() {
-  runApp(const SecureChatApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const CardiaOfflineApp());
 }
 
-class SecureChatApp extends StatelessWidget {
-  const SecureChatApp({super.key});
-
+class CardiaOfflineApp extends StatelessWidget {
+  const CardiaOfflineApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Apscroworld',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: const Color(0xFF00C853),
-        scaffoldBackgroundColor: const Color(0xFF050505),
-      ),
-      home: const HomeScreen(),
+      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
+      home: const ChatBase(),
     );
   }
 }
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
+class ChatBase extends StatefulWidget {
+  const ChatBase({super.key});
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<ChatBase> createState() => _ChatBaseState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0;
+class _ChatBaseState extends State<ChatBase> {
+  final EncryptionService _enc = EncryptionService();
+  final TextEditingController _con = TextEditingController();
+  List<Map<String, String>> _messages = [];
+  late SharedPreferences _prefs;
 
-  final List<Map<String, String>> chats = [
-    {"name": "Admin Pro", "msg": "نظام التشفير يعمل بنجاح..."},
-    {"name": "Secure Node 01", "msg": "تم استقبال البيانات المشفرة."},
-    {"name": "Root Master", "msg": "تحذير: محاولة دخول غير مصرح بها تم صدها."},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  // تحميل الرسائل من ذاكرة الهاتف
+  _loadData() async {
+    _prefs = await SharedPreferences.getInstance();
+    String? saved = _prefs.getString('local_db');
+    if (saved != null) {
+      setState(() {
+        _messages = List<Map<String, String>>.from(json.decode(saved).map((item) => Map<String, String>.from(item)));
+      });
+    }
+  }
+
+  // حفظ الرسالة مشفرة في ذاكرة الهاتف
+  _sendMessage() async {
+    if (_con.text.isEmpty) return;
+    
+    String time = DateFormat('hh:mm a').format(DateTime.now());
+    String encryptedText = _enc.encrypt(_con.text);
+
+    setState(() {
+      _messages.insert(0, {
+        'text': encryptedText,
+        'time': time,
+        'sender': 'Me'
+      });
+    });
+
+    _con.clear();
+    await _prefs.setString('local_db', json.encode(_messages));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        title: const Text("CARDIA OFFLINE", style: TextStyle(letterSpacing: 2, fontWeight: FontWeight.bold, fontSize: 16)),
         backgroundColor: Colors.black,
-        title: const Text('APSCROWORLD', style: TextStyle(color: Color(0xFF00C853), letterSpacing: 2)),
-        actions: [IconButton(icon: const Icon(Icons.qr_code_scanner, color: Color(0xFF00C853)), onPressed: () {})],
+        elevation: 0,
+        actions: [
+          IconButton(icon: const Icon(Icons.delete_sweep, color: Colors.redAccent), onPressed: () async {
+            await _prefs.clear();
+            setState(() => _messages = []);
+          })
+        ],
       ),
-      body: _currentIndex == 0 ? _buildChatList() : _buildCallLogs(),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.black,
-        selectedItemColor: const Color(0xFF00C853),
-        unselectedItemColor: Colors.grey,
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: "دردشة"),
-          BottomNavigationBarItem(icon: Icon(Icons.call), label: "مكالمات"),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: "إعدادات"),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              reverse: true,
+              itemCount: _messages.length,
+              itemBuilder: (context, i) {
+                String plainText = _enc.decrypt(_messages[i]['text']!);
+                return _bubble(plainText, _messages[i]['time']!);
+              },
+            ),
+          ),
+          _inputArea(),
         ],
       ),
     );
   }
 
-  Widget _buildChatList() {
-    return ListView.builder(
-      itemCount: chats.length,
-      itemBuilder: (context, index) {
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: const Color(0xFF00C853),
-            child: Text(chats[index]['name']![0], style: const TextStyle(color: Colors.black)),
-          ),
-          title: Text(chats[index]['name']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text(chats[index]['msg']!, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-          trailing: const Text("12:00", style: TextStyle(color: Colors.grey, fontSize: 10)),
-          onTap: () {},
-        );
-      },
+  Widget _bubble(String text, String time) {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.cyanAccent.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(15).copyWith(bottomRight: Radius.zero),
+          border: Border.all(color: Colors.cyanAccent.withOpacity(0.3)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(text, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            const SizedBox(height: 4),
+            Text(time, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildCallLogs() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+  Widget _inputArea() {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      child: Row(
         children: [
-          Icon(Icons.security, size: 80, color: Color(0xFF00C853)),
-          SizedBox(height: 10),
-          Text("سجل المكالمات مشفر بالكامل", style: TextStyle(color: Colors.grey)),
+          Expanded(
+            child: TextField(
+              controller: _con,
+              decoration: InputDecoration(
+                hintText: "Vault message...",
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          CircleAvatar(
+            backgroundColor: Colors.cyanAccent,
+            child: IconButton(icon: const Icon(Icons.send, color: Colors.black), onPressed: _sendMessage),
+          )
         ],
       ),
     );
