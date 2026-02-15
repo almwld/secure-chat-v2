@@ -1,36 +1,30 @@
 workflows:
-  apscroworld-workflow:
-    name: Apscroworld Build
+  android-vault-build:
+    name: Cardia Satellite Build
     max_build_duration: 60
+    instance_type: mac_mini_m1
     environment:
       flutter: stable
+      java: 17
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
     scripts:
-      - name: Hard Reset and Reconstruct
+      - name: Set up local.properties
         script: |
-          # 1. حفظ ملفاتنا الحيوية في الذاكرة المؤقتة للماشين
-          cp -r lib ../lib_backup
-          cp pubspec.yaml ../pubspec_backup
-          [ -d "assets" ] && cp -r assets ../assets_backup || mkdir ../assets_backup
-          
-          # 2. تنظيف شامل للمجلد الحالي (حذف كل شيء بما فيه المجلدات المخفية)
-          rm -rf ./* ./.* 2>/dev/null || true
-          
-          # 3. إنشاء مشروع فلوتر جديد تماماً في نفس المكان
-          flutter create --project-name apscroworld_app .
-          
-          # 4. استعادة ملفاتنا الأصلية فوق المشروع الجديد
-          rm -rf lib
-          cp -r ../lib_backup ./lib
-          cp ../pubspec_backup ./pubspec.yaml
-          cp -r ../assets_backup ./assets 2>/dev/null || true
-          
-      - name: Get dependencies
-        script: flutter packages pub get
-        
-      - name: Build APK
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
+      - name: Get Flutter packages
         script: |
-          # إضافة سطر التأكد من استخدام أحدث إصدار من Gradle
-          flutter build apk --release --no-pub
-          
+          flutter pub get
+      - name: Build Android APK
+        script: |
+          flutter build apk --release --split-per-abi
     artifacts:
-      - build/app/outputs/apk/release/*.apk
+      - build/app/outputs/flutter-apk/*.apk
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com # ضع بريدك هنا ليصلك الرابط عند الانتهاء
