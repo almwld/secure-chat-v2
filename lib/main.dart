@@ -1,71 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'dart:async';
 import 'package:intl/intl.dart';
-import 'package:uuid/uuid.dart';
 import 'security.dart';
 
-void main() => runApp(const CardiaHybridApp());
+void main() => runApp(const CardiaCloakApp());
 
-class CardiaHybridApp extends StatelessWidget {
-  const CardiaHybridApp({super.key});
+class CardiaCloakApp extends StatelessWidget {
+  const CardiaCloakApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF050505),
-        primaryColor: Colors.cyanAccent,
-      ),
-      home: const MeshChatScreen(),
+      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: const Color(0xFF080808)),
+      home: const CloakChatScreen(),
     );
   }
 }
 
-class MeshChatScreen extends StatefulWidget {
-  const MeshChatScreen({super.key});
+class CloakChatScreen extends StatefulWidget {
+  const CloakChatScreen({super.key});
   @override
-  State<MeshChatScreen> createState() => _MeshChatScreenState();
+  State<CloakChatScreen> createState() => _CloakChatScreenState();
 }
 
-class _MeshChatScreenState extends State<MeshChatScreen> {
+class _CloakChatScreenState extends State<CloakChatScreen> {
   final EncryptionService _enc = EncryptionService();
   final TextEditingController _con = TextEditingController();
   List<Map<String, dynamic>> _messages = [];
-  List<String> _nearbyNodes = []; // قائمة الجيران المكتشفين
-  bool _isScanning = false;
   late SharedPreferences _prefs;
 
   @override
   void initState() {
     super.initState();
-    _initApp();
+    _initStorage();
   }
 
-  _initApp() async {
+  _initStorage() async {
     _prefs = await SharedPreferences.getInstance();
     _loadMessages();
-    _startRadar();
-  }
-
-  // تشغيل رادار البحث عن جيران (محاكاة P2P Discovery)
-  _startRadar() {
-    setState(() => _isScanning = true);
-    Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (mounted) {
-        setState(() {
-          // محاكاة اكتشاف جهاز قريب عند الاتصال بنفس الميكروتيك
-          if (_nearbyNodes.length < 3) {
-            _nearbyNodes.add("Node-${const Uuid().v4().substring(0, 4)}");
-          }
-        });
-      }
-    });
   }
 
   _loadMessages() {
-    String? data = _prefs.getString('mesh_db');
+    String? data = _prefs.getString('cloak_db');
     if (data != null) {
       setState(() => _messages = List<Map<String, dynamic>>.from(json.decode(data)));
     }
@@ -73,55 +50,28 @@ class _MeshChatScreenState extends State<MeshChatScreen> {
 
   _sendMessage() async {
     if (_con.text.isEmpty) return;
-
     final msg = {
-      'id': const Uuid().v4(),
-      'text': _enc.encrypt(_con.text),
+      'payload': _enc.encrypt(_con.text),
       'time': DateFormat('HH:mm').format(DateTime.now()),
-      'status': _nearbyNodes.isEmpty ? 'Stored' : 'Relayed',
-      'from': 'Me'
+      'isMe': true
     };
-
     setState(() => _messages.insert(0, msg));
     _con.clear();
-    await _prefs.setString('mesh_db', json.encode(_messages));
+    await _prefs.setString('cloak_db', json.encode(_messages));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("CARDIA MESH", style: TextStyle(letterSpacing: 2, fontWeight: FontWeight.bold)),
+        title: const Text("CARDIA CLOAK", style: TextStyle(letterSpacing: 3, fontWeight: FontWeight.w900, color: Colors.cyanAccent)),
         backgroundColor: Colors.black,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(40),
-          child: _buildRadarBar(),
-        ),
+        actions: [const Icon(Icons.remove_red_eye_outlined), const SizedBox(width: 15)],
       ),
       body: Column(
         children: [
           Expanded(child: _buildChatList()),
           _buildInput(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRadarBar() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-      color: Colors.cyanAccent.withOpacity(0.05),
-      child: Row(
-        children: [
-          Icon(Icons.radar, size: 16, color: _isScanning ? Colors.cyanAccent : Colors.grey),
-          const SizedBox(width: 10),
-          Text(
-            _nearbyNodes.isEmpty ? "Scanning for nodes..." : "${_nearbyNodes.length} Nodes Nearby",
-            style: TextStyle(fontSize: 12, color: Colors.cyanAccent.withOpacity(0.7)),
-          ),
-          const Spacer(),
-          if (_nearbyNodes.isNotEmpty)
-            const Icon(Icons.compare_arrows, size: 16, color: Colors.greenAccent),
         ],
       ),
     );
@@ -133,36 +83,30 @@ class _MeshChatScreenState extends State<MeshChatScreen> {
       itemCount: _messages.length,
       itemBuilder: (context, i) {
         var m = _messages[i];
-        bool isMe = m['from'] == 'Me';
-        return _bubble(_enc.decrypt(m['text']), isMe, m['status'], m['time']);
+        String realText = _enc.decrypt(m['payload']);
+        String coverText = _enc.getCoverOnly(m['payload']);
+        return _bubble(realText, coverText, m['isMe'], m['time']);
       },
     );
   }
 
-  Widget _bubble(String text, bool isMe, String status, String time) {
+  Widget _bubble(String real, String cover, bool isMe, String time) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+        margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isMe ? Colors.cyanAccent.withOpacity(0.1) : Colors.white10,
+          color: isMe ? Colors.cyanAccent.withOpacity(0.08) : Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: status == 'Relayed' ? Colors.greenAccent.withOpacity(0.3) : Colors.white10),
+          border: Border.all(color: Colors.white10),
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(text, style: const TextStyle(color: Colors.white)),
-            const SizedBox(height: 4),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(time, style: const TextStyle(fontSize: 9, color: Colors.white38)),
-                const SizedBox(width: 5),
-                Icon(status == 'Relayed' ? Icons.done_all : Icons.timer, size: 10, color: Colors.white38),
-              ],
-            ),
+            Text(real, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            const SizedBox(height: 5),
+            Text("Cloak: $cover", style: const TextStyle(color: Colors.white24, fontSize: 9, fontStyle: FontStyle.italic)),
           ],
         ),
       ),
@@ -172,25 +116,15 @@ class _MeshChatScreenState extends State<MeshChatScreen> {
   Widget _buildInput() {
     return Container(
       padding: const EdgeInsets.all(15),
-      color: Colors.black,
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _con,
-              decoration: InputDecoration(
-                hintText: "Broadcast to Mesh...",
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
-              ),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.send, color: Colors.cyanAccent),
-            onPressed: _sendMessage,
-          ),
-        ],
+      child: TextField(
+        controller: _con,
+        decoration: InputDecoration(
+          hintText: "Write undercover...",
+          suffixIcon: IconButton(icon: const Icon(Icons.send, color: Colors.cyanAccent), onPressed: _sendMessage),
+          filled: true,
+          fillColor: Colors.white.withOpacity(0.03),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+        ),
       ),
     );
   }
