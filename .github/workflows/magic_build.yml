@@ -1,4 +1,4 @@
-name: Cardia_Magic_Cloud_Build
+name: Auto_Cloud_Build
 on: [push, workflow_dispatch]
 jobs:
   build:
@@ -13,5 +13,5 @@ jobs:
       - run: flutter build apk --release
       - uses: actions/upload-artifact@v4
         with:
-          name: Cardia-Ultimate-APK
+          name: Cardia-Satellite-APK
           path: build/app/outputs/flutter-apk/app-release.apk

@@ -1,26 +1,21 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
+import 'package:local_auth/local_auth.dart';
 import 'dart:io';
-import 'package:image_picker/image_picker.dart';
 
-void main() => runApp(const CardiaSatellite());
+void main() => runApp(const CardiaOS());
 
-class CardiaSatellite extends StatelessWidget {
-  const CardiaSatellite({super.key});
+class CardiaOS extends StatelessWidget {
+  const CardiaOS({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF010A01),
-        primaryColor: Colors.greenAccent,
-      ),
+      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: const Color(0xFF010A01)),
       home: const CalculatorDecoy(),
     );
   }
 }
 
-// --- واجهة التمويه (الآلة الحاسبة) ---
 class CalculatorDecoy extends StatefulWidget {
   const CalculatorDecoy({super.key});
   @override
@@ -29,12 +24,33 @@ class CalculatorDecoy extends StatefulWidget {
 
 class _CalculatorDecoyState extends State<CalculatorDecoy> {
   String _input = "0";
+  final LocalAuthentication auth = LocalAuthentication();
+
+  Future<void> _authenticate(bool isPanic) async {
+    try {
+      bool authenticated = await auth.authenticate(
+        localizedReason: 'Secure Access Verification',
+        options: const AuthenticationOptions(biometricOnly: true),
+      );
+      if (authenticated) {
+        if (isPanic) {
+          exit(0); // هنا نضع كود المسح لاحقاً
+        } else {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const SecureTerminal()));
+        }
+      }
+    } catch (e) {
+      // في حال عدم دعم البصمة
+    }
+  }
+
   void _onKey(String v) {
     setState(() {
       if (v == "C") _input = "0";
       else if (_input == "0") _input = v;
       else _input += v;
-      if (_input == "7391") Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const SatelliteTerminal()));
+      if (_input == "7391") _authenticate(false);
+      if (_input == "999") _authenticate(true);
     });
   }
 
@@ -44,7 +60,7 @@ class _CalculatorDecoyState extends State<CalculatorDecoy> {
       body: Column(
         children: [
           Expanded(child: Container(alignment: Alignment.bottomRight, padding: const EdgeInsets.all(30),
-            child: Text(_input, style: const TextStyle(fontSize: 50, fontFamily: 'monospace', color: Colors.greenAccent)))),
+            child: Text(_input, style: const TextStyle(fontSize: 50, color: Colors.greenAccent)))),
           _buildPad(),
         ],
       ),
@@ -58,78 +74,10 @@ class _CalculatorDecoyState extends State<CalculatorDecoy> {
   }
 }
 
-// --- المحطة الفضائية والخزنة الاستخباراتية ---
-class SatelliteTerminal extends StatefulWidget {
-  const SatelliteTerminal({super.key});
-  @override
-  State<SatelliteTerminal> createState() => _SatelliteTerminalState();
-}
-
-class _SatelliteTerminalState extends State<SatelliteTerminal> {
-  int _tab = 0;
-  List<File> _secretPhotos = [];
-  final ImagePicker _picker = ImagePicker();
-
-  Future<void> _captureIntel() async {
-    final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
-    if (photo != null) {
-      setState(() => _secretPhotos.add(File(photo.path)));
-    }
-  }
-
+class SecureTerminal extends StatelessWidget {
+  const SecureTerminal({super.key});
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_tab == 0 ? "SATELLITE TERMINAL" : "INTEL VAULT", style: const TextStyle(fontSize: 10, letterSpacing: 2)),
-        backgroundColor: Colors.black,
-      ),
-      body: _tab == 0 ? _buildTerminal() : _buildVault(),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tab,
-        onTap: (i) => setState(() => _tab = i),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.settings_input_antenna), label: "Uplink"),
-          BottomNavigationBarItem(icon: Icon(Icons.visibility_off), label: "Intel"),
-        ],
-      ),
-      floatingActionButton: _tab == 1 ? FloatingActionButton(
-        onPressed: _captureIntel,
-        backgroundColor: Colors.redAccent,
-        child: const Icon(Icons.camera_alt, color: Colors.white),
-      ) : null,
-    );
-  }
-
-  Widget _buildTerminal() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Center(child: Icon(Icons.radar, size: 100, color: Colors.greenAccent)),
-          const SizedBox(height: 30),
-          const Text("> NODE CONNECTED: ORBIT_X1", style: TextStyle(color: Colors.greenAccent, fontSize: 12)),
-          const Text("> ENCRYPTION: MIL-SPEC AES-256", style: TextStyle(color: Colors.greenAccent, fontSize: 12)),
-          const Spacer(),
-          ElevatedButton(onPressed: (){}, style: ElevatedButton.styleFrom(backgroundColor: Colors.green.withOpacity(0.1)), child: const Center(child: Text("ESTABLISH QUANTUM LINK"))),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVault() {
-    return _secretPhotos.isEmpty 
-      ? const Center(child: Text("NO CLASSIFIED DATA FOUND", style: TextStyle(color: Colors.grey)))
-      : GridView.builder(
-          padding: const EdgeInsets.all(10),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 10, mainAxisSpacing: 10),
-          itemCount: _secretPhotos.length,
-          itemBuilder: (c, i) => ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.file(_secretPhotos[i], fit: BoxFit.cover),
-          ),
-        );
+    return Scaffold(appBar: AppBar(title: const Text("SATELLITE LINK ACTIVE")), body: const Center(child: Text("SECURE DATA MODE")));
   }
 }
