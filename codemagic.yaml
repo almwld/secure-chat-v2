@@ -1,20 +1,19 @@
 workflows:
-  android-release:
-    name: Secure Chat Rescue Build
-    instance_type: mac_mini_m2
+  release-build:
+    name: Build Apscroworld Release
+    max_build_duration: 60
+    environment:
+      flutter: stable
     scripts:
-      - name: Pure Project Setup
-        script: |
-          rm -rf android # حذف مجلد أندرويد بالكامل لإعادة إنشائه بنظافة
-          flutter create --platforms android --org com.cardiachat --project-name secure_chat_app .
-          
-          # إضافة صلاحية الإنترنت
-          sed -i '' 's|<manifest|<manifest xmlns:android="http://schemas.android.com/apk/res/android"> \n    <uses-permission android:name="android.permission.INTERNET"/>|' android/app/src/main/AndroidManifest.xml
-          
-          flutter pub get
-          # تخطي الأيقونة مؤقتاً للتأكد من أن الشاشة البيضاء ليست بسببها
-      - name: Build APK
-        script: |
-          flutter build apk --release
+      - name: Fetch Dependencies
+        script: flutter packages pub get
+      - name: Generate App Icons
+        script: flutter pub run flutter_launcher_icons
+      - name: Build Android APK
+        script: flutter build apk --release
     artifacts:
-      - build/app/outputs/flutter-apk/*.apk
+      - build/app/outputs/apk/release/*.apk
+    publishing:
+      email:
+        recipients:
+          - admin@apscroworld.com # ضع إيميلك هنا

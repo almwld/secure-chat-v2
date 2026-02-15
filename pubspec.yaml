@@ -1,6 +1,5 @@
-name: secure_chat_app
-description: "A secure chat application."
-publish_to: 'none'
+name: apscroworld_app
+description: The ultimate secure messaging app - Apscroworld Edition.
 version: 1.0.0+1
 
 environment:
@@ -9,27 +8,22 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^3.0.0
-  cloud_firestore: ^5.0.0
-  encrypt: ^5.0.3
-  intl: ^0.19.0
   cupertino_icons: ^1.0.2
+  shared_preferences: ^2.2.2  # لحفظ إعدادات الخصوصية
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.0
-  flutter_launcher_icons: ^0.13.1
+  flutter_launcher_icons: ^0.13.1 # مولد الأيقونات الآلي
 
 flutter_launcher_icons:
-  android: "launcher_icon"
-  ios: false # تم التغيير إلى false لتعطيل البحث عن مجلدات iOS
-  image_path: "assets/icon/app_icon.png"
-  min_sdk_android: 21
-  adaptive_icon_background: "#121212"
-  adaptive_icon_foreground: "assets/icon/app_icon.png"
+  android: true
+  ios: true
+  image_path: "assets/logo/icon.png"
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/logo/icon.png"
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/icon/app_icon.png
+    - assets/logo/icon.png
