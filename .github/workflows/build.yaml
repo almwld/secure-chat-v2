@@ -4,14 +4,22 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: subosito/flutter-action@v2
+      - uses: actions/checkout@v4 # تحديث لنسخة v4
+      
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.0'
+          flutter-version: '3.19.0' # استخدام نسخة مستقرة وحديثة
+          cache: true # تسريع البناء في المرات القادمة
+          
       - run: flutter pub get
-      - run: flutter build apk --release
+      
+      - name: Build Release APK
+        run: flutter build apk --release --split-per-abi # لبناء نسخ أخف وزناً
+        
       - name: Upload APK
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4 # الإصدار المطلوب v4
         with:
-          name: cardia-release-apk
+          name: Cardia-Ultimate-Production
           path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7 # حفظ الملف لمدة أسبوع
