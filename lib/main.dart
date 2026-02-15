@@ -17,8 +17,7 @@ class CardiaChatApp extends StatelessWidget {
       title: 'CardiaChat',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF020202),
-        primaryColor: Colors.cyanAccent,
+        scaffoldBackgroundColor: Colors.black,
       ),
       home: const BootSequence(),
     );
@@ -54,18 +53,14 @@ class _BootSequenceState extends State<BootSequence> {
 
   Widget _buildSplash() {
     return Scaffold(
+      backgroundColor: Colors.black,
       body: Center(
         child: Column(
           mainAxisAlignment: MainCenterAxisAlignment.center,
           children: [
-            TweenAnimationBuilder(
-              duration: const Duration(seconds: 2),
-              tween: Tween<double>(begin: 0, end: 1),
-              builder: (context, double val, child) => Opacity(opacity: val, child: child),
-              child: const Icon(Icons.shield_rounded, size: 100, color: Colors.cyanAccent),
-            ),
-            const SizedBox(height: 40),
-            const CircularProgressIndicator(color: Colors.cyanAccent, strokeWidth: 1),
+            const Icon(Icons.shield_rounded, size: 80, color: Colors.cyanAccent),
+            const SizedBox(height: 20),
+            const Text("CARDIA SYSTEM", style: TextStyle(letterSpacing: 5, color: Colors.cyanAccent, fontSize: 12)),
           ],
         ),
       ),
@@ -87,19 +82,49 @@ class _CardiaHomeState extends State<CardiaHome> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("CardiaChat", style: TextStyle(letterSpacing: 3, fontWeight: FontWeight.w900)),
-        backgroundColor: Colors.black,
-        elevation: 0,
-        actions: [
-          IconButton(icon: const Icon(Icons.circle, color: Colors.greenAccent, size: 12), onPressed: () {}),
+      body: Stack(
+        children: [
+          // 1. طبقة الخلفية الفنية (Background Image Layer)
+          Positioned.fill(
+            child: Image.network(
+              'https://images.unsplash.com/photo-1639762681485-074b7f938ba0?q=80&w=2064&auto=format&fit=crop', // صورة تقنية فنية
+              fit: BoxFit.cover,
+            ),
+          ),
+          // 2. طبقة التعتيم لجعل الرسائل واضحة
+          Positioned.fill(
+            child: Container(color: Colors.black.withOpacity(0.7)),
+          ),
+          // 3. محتوى التطبيق
+          SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(),
+                Expanded(child: _messageStream()),
+                _inputBar(),
+              ],
+            ),
+          ),
         ],
       ),
-      body: Column(
-        children: [
-          Expanded(child: _messageStream()),
-          _inputBar(),
-        ],
+    );
+  }
+
+  Widget _buildHeader() {
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          color: Colors.white.withOpacity(0.05),
+          child: Row(
+            mainAxisAlignment: MainCenterAxisAlignment.spaceBetween,
+            children: [
+              const Text("CARDIA PRO", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2, color: Colors.cyanAccent)),
+              const Icon(Icons.circle, color: Colors.greenAccent, size: 10),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -108,45 +133,40 @@ class _CardiaHomeState extends State<CardiaHome> {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('messages').orderBy('createdAt', descending: true).snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Colors.cyanAccent));
         return ListView.builder(
           reverse: true,
+          padding: const EdgeInsets.all(15),
           itemCount: snapshot.data!.docs.length,
           itemBuilder: (context, index) {
             var doc = snapshot.data!.docs[index];
             bool isMe = doc['senderId'] == _userName;
             String text = _enc.decrypt(doc['text'] ?? "");
-            return _chatBubble(text, isMe, doc['senderId'] ?? "User");
+            return _chatBubble(text, isMe);
           },
         );
       },
     );
   }
 
-  Widget _chatBubble(String text, bool isMe, String sender) {
+  Widget _chatBubble(String text, bool isMe) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Column(
-        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
-            child: Text(sender, style: const TextStyle(fontSize: 8, color: Colors.white38)),
-          ),
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 15),
-            padding: const EdgeInsets.all(14),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 5),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: isMe ? Colors.cyanAccent.withOpacity(0.1) : Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(18).copyWith(
-                bottomRight: isMe ? Radius.zero : const Radius.circular(18),
-                bottomLeft: isMe ? const Radius.circular(18) : Radius.zero,
-              ),
+              color: isMe ? Colors.cyanAccent.withOpacity(0.2) : Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(15),
               border: Border.all(color: isMe ? Colors.cyanAccent.withOpacity(0.3) : Colors.white10),
             ),
             child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 15)),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -154,23 +174,23 @@ class _CardiaHomeState extends State<CardiaHome> {
   Widget _inputBar() {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.black, border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05)))),
+      color: Colors.black.withOpacity(0.8),
       child: Row(
         children: [
           Expanded(
             child: TextField(
               controller: _con,
               decoration: InputDecoration(
-                hintText: "Transmit secure data...",
+                hintText: "Secure Link...",
                 filled: true,
-                fillColor: Colors.white.withOpacity(0.03),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
               ),
             ),
           ),
           const SizedBox(width: 10),
           IconButton(
-            icon: const Icon(Icons.send_rounded, color: Colors.cyanAccent),
+            icon: const Icon(Icons.bolt_rounded, color: Colors.cyanAccent),
             onPressed: () {
               if (_con.text.isNotEmpty) {
                 FirebaseFirestore.instance.collection('messages').add({
