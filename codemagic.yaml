@@ -16,3 +16,4 @@ workflows:
         script: flutter build apk --release --no-pub
     artifacts:
       - build/app/outputs/apk/release/*.apk
+ 
