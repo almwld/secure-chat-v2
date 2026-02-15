@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
+import 'dart:async';
 
-void main() => runApp(const CardiaQuantum());
+void main() => runApp(const CardiaSatellite());
 
-class CardiaQuantum extends StatelessWidget {
-  const CardiaQuantum({super.key});
+class CardiaSatellite extends StatelessWidget {
+  const CardiaSatellite({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF00080F),
-        colorScheme: const ColorScheme.dark(primary: Colors.cyanAccent),
+        scaffoldBackgroundColor: const Color(0xFF010A01), // لون أخضر عسكري غامق
+        primaryColor: Colors.greenAccent,
       ),
       home: const CalculatorDecoy(),
     );
   }
 }
 
-// --- واجهة التمويه (آلة حاسبة حقيقية) ---
+// --- واجهة التمويه ---
 class CalculatorDecoy extends StatefulWidget {
   const CalculatorDecoy({super.key});
   @override
@@ -27,14 +27,12 @@ class CalculatorDecoy extends StatefulWidget {
 
 class _CalculatorDecoyState extends State<CalculatorDecoy> {
   String _input = "0";
-  void _onKey(String val) {
+  void _onKey(String v) {
     setState(() {
-      if (val == "C") _input = "0";
-      else if (_input == "0") _input = val;
-      else _input += val;
-      if (_input == "7391") {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const QuantumVault()));
-      }
+      if (v == "C") _input = "0";
+      else if (_input == "0") _input = v;
+      else _input += v;
+      if (_input == "7391") Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const SatelliteTerminal()));
     });
   }
 
@@ -44,7 +42,7 @@ class _CalculatorDecoyState extends State<CalculatorDecoy> {
       body: Column(
         children: [
           Expanded(child: Container(alignment: Alignment.bottomRight, padding: const EdgeInsets.all(30),
-            child: Text(_input, style: const TextStyle(fontSize: 70, fontWeight: FontWeight.w200)))),
+            child: Text(_input, style: const TextStyle(fontSize: 50, fontFamily: 'monospace', color: Colors.greenAccent)))),
           _buildPad(),
         ],
       ),
@@ -52,73 +50,84 @@ class _CalculatorDecoyState extends State<CalculatorDecoy> {
   }
 
   Widget _buildPad() {
-    var keys = ["7","8","9","/", "4","5","6","*", "1","2","3","-", "C","0","=","+"];
-    return GridView.builder(
-      shrinkWrap: true, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4),
-      itemCount: keys.length, itemBuilder: (c, i) => TextButton(
-        onPressed: () => _onKey(keys[i]),
-        child: Text(keys[i], style: const TextStyle(fontSize: 25, color: Colors.cyanAccent))),
-    );
+    var k = ["7","8","9","/", "4","5","6","*", "1","2","3","-", "C","0","=","+"];
+    return GridView.builder(shrinkWrap: true, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4),
+      itemCount: k.length, itemBuilder: (c, i) => TextButton(onPressed: () => _onKey(k[i]), child: Text(k[i], style: const TextStyle(fontSize: 24, color: Colors.greenAccent))));
   }
 }
 
-// --- الخزنة المتطورة (تفعيل التشفير والربط) ---
-class QuantumVault extends StatefulWidget {
-  const QuantumVault({super.key});
+// --- المحطة الفضائية (Satellite Terminal) ---
+class SatelliteTerminal extends StatefulWidget {
+  const SatelliteTerminal({super.key});
   @override
-  State<QuantumVault> createState() => _QuantumVaultState();
+  State<SatelliteTerminal> createState() => _SatelliteTerminalState();
 }
 
-class _QuantumVaultState extends State<QuantumVault> {
-  bool _isLocked = true; // مفتاح قفل/فتح التشفير
-  int _tab = 0;
+class _SatelliteTerminalState extends State<SatelliteTerminal> {
+  bool _isUplink = false;
+  double _azimuth = 145.0;
+
+  void _triggerUplink() {
+    setState(() => _isUplink = true);
+    Timer(const Duration(seconds: 3), () => setState(() => _isUplink = false));
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("QUANTUM LINK: ACTIVE", style: TextStyle(fontSize: 12, letterSpacing: 2)),
-        actions: [
-          Row(children: [
-            const Text("DECRYPT", style: TextStyle(fontSize: 10)),
-            Switch(value: !_isLocked, activeColor: Colors.greenAccent, 
-              onChanged: (v) => setState(() => _isLocked = !v)),
-          ])
-        ],
+        title: const Text("SATELLITE UPLINK ACTIVE", style: TextStyle(fontSize: 10, letterSpacing: 2)),
+        backgroundColor: Colors.black,
       ),
-      body: _tab == 0 ? _buildMessages() : _buildRadar(),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tab, onTap: (i) => setState(() => _tab = i),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.security), label: "Vault"),
-          BottomNavigationBarItem(icon: Icon(Icons.radar), label: "Radar"),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMessages() {
-    // محاكاة لرسالة مشفرة قادمة من هاتف آخر
-    String rawData = "SGVsbG8gRnJvbSBPdGhlciBTaWRlID8="; 
-    String decoded = utf8.decode(base64.decode(rawData));
-
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Card(
-          color: Colors.white10,
-          child: ListTile(
-            leading: Icon(_isLocked ? Icons.lock : Icons.lock_open, color: Colors.cyanAccent),
-            title: const Text("Node: Alpha-Delta"),
-            subtitle: Text(_isLocked ? rawData : decoded, 
-              style: TextStyle(fontFamily: _isLocked ? 'monospace' : null, color: _isLocked ? Colors.grey : Colors.white)),
+      body: Column(
+        children: [
+          _buildCompassView(),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(color: Colors.black, border: Border.all(color: Colors.greenAccent.withOpacity(0.2))),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("> INITIALIZING NTN PROTOCOL...", style: TextStyle(color: Colors.greenAccent, fontSize: 10)),
+                  const Text("> SEARCHING FOR ORBITAL NODE...", style: TextStyle(color: Colors.greenAccent, fontSize: 10)),
+                  if (!_isUplink) const Text("> STATUS: STANDBY", style: TextStyle(color: Colors.amber, fontSize: 10)),
+                  if (_isUplink) const Text("> STATUS: DATA BURST TRANSMITTING...", style: TextStyle(color: Colors.redAccent, fontSize: 10)),
+                  const Spacer(),
+                  const Text("LAST MESSAGE RECEIVED:", style: TextStyle(fontSize: 10, color: Colors.grey)),
+                  const Text("COORD: 15.35N, 44.20E | TX_SUCCESS", style: TextStyle(color: Colors.greenAccent)),
+                ],
+              ),
+            ),
           ),
-        ),
-      ],
+          _buildActionButtons(),
+        ],
+      ),
     );
   }
 
-  Widget _buildRadar() {
-    return const Center(child: CircularProgressIndicator(color: Colors.cyanAccent));
+  Widget _buildCompassView() {
+    return Container(
+      height: 180,
+      margin: const EdgeInsets.all(20),
+      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.greenAccent, width: 2)),
+      child: Center(
+        child: Icon(Icons.navigation, size: 80, color: Colors.greenAccent, angle: _azimuth),
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          ElevatedButton(onPressed: _triggerUplink, style: ElevatedButton.styleFrom(backgroundColor: Colors.red.withOpacity(0.2)), child: const Text("TX BURST")),
+          ElevatedButton(onPressed: () {}, style: ElevatedButton.styleFrom(backgroundColor: Colors.green.withOpacity(0.2)), child: const Text("SCRAMBLE")),
+        ],
+      ),
+    );
   }
 }
