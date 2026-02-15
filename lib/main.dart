@@ -1,91 +1,165 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'dart:convert';
 import 'dart:async';
+import 'package:intl/intl.dart';
 import 'security.dart';
 
-void main() => runApp(const CardiaTurboApp());
+void main() => runApp(const CardiaOS());
 
-class CardiaTurboApp extends StatelessWidget {
-  const CardiaTurboApp({super.key});
+class CardiaOS extends StatelessWidget {
+  const CardiaOS({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: const Color(0xFF00050A)),
-      home: const TurboChat(),
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF00050A),
+        primaryColor: Colors.cyanAccent,
+      ),
+      home: const CyberLogin(),
     );
   }
 }
 
-class TurboChat extends StatefulWidget {
-  const TurboChat({super.key});
+// 1. شاشة الدخول (Gate)
+class CyberLogin extends StatefulWidget {
+  const CyberLogin({super.key});
   @override
-  State<TurboChat> createState() => _TurboChatState();
+  State<CyberLogin> createState() => _CyberLoginState();
 }
 
-class _TurboChatState extends State<TurboChat> {
+class _CyberLoginState extends State<CyberLogin> {
+  final TextEditingController _pin = TextEditingController();
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.security, size: 80, color: Colors.cyanAccent),
+            const SizedBox(height: 20),
+            const Text("SECURE ACCESS", style: TextStyle(letterSpacing: 4, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 40),
+            SizedBox(
+              width: 150,
+              child: TextField(
+                controller: _pin,
+                obscureText: true,
+                textAlign: TextAlign.center,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(letterSpacing: 10, color: Colors.cyanAccent),
+                onChanged: (v) {
+                  if (v == "1234") Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const MainDashboard()));
+                  if (v == "9999") _pin.clear(); // منطق المسح هنا
+                },
+                decoration: const InputDecoration(hintText: "PIN", border: OutlineInputBorder()),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// 2. لوحة التحكم الرئيسية (Dashboard)
+class MainDashboard extends StatefulWidget {
+  const MainDashboard({super.key});
+  @override
+  State<MainDashboard> createState() => _MainDashboardState();
+}
+
+class _MainDashboardState extends State<MainDashboard> {
   final EncryptionService _enc = EncryptionService();
-  String _status = "READY";
-  double _speed = 0.0;
+  final TextEditingController _msgCon = TextEditingController();
+  final List<Map<String, dynamic>> _messages = [];
+  bool _isTunneling = false;
+  double _load = 0.0;
 
-  // محرك الإرسال المتوازي (التوربو)
-  Future<void> _sendTurbo(String largeData) async {
-    int chunkSize = 45;
-    List<String> chunks = [];
-    
-    // 1. تقطيع البيانات
-    for (var i = 0; i < largeData.length; i += chunkSize) {
-      chunks.add(largeData.substring(i, i + chunkSize > largeData.length ? largeData.length : i + chunkSize));
-    }
-
-    setState(() => _status = "BURSTING...");
-
-    // 2. إرسال 10 طرود في آن واحد (Parallel Burst)
-    for (var i = 0; i < chunks.length; i += 10) {
-      int end = (i + 10 < chunks.length) ? i + 10 : chunks.length;
-      List<Future> burst = [];
-      
-      for (var j = i; j < end; j++) {
-        String packet = "${j}_${_enc.encrypt(chunks[j])}.t.local";
-        burst.add(InternetAddress.lookup(packet));
-      }
-
-      // إضافة طرد وهمي للتمويه 
-      burst.add(InternetAddress.lookup("google.com")); 
-      burst.add(InternetAddress.lookup("connectivitycheck.gstatic.com")); 
-      // تأخير عشوائي بسيط لكسر النمط 
-      await Future.delayed(Duration(milliseconds: (new DateTime.now().millisecond % 100)));
-      await Future.wait(burst).catchError((e) => []); // إرسال الدفعة
-      
-      setState(() {
-        _speed = (i / chunks.length);
-      });
-    }
-
+  // محرك الإرسال النفقي السريع
+  Future<void> _sendData(String text) async {
+    String secret = _enc.encrypt(text);
     setState(() {
-      _status = "FINISHED";
-      _speed = 0.0;
+       _messages.insert(0, {'msg': text, 'isMe': true, 'time': DateFormat('HH:mm').format(DateTime.now())});
+       _load = 0.1;
     });
+
+    if (_isTunneling) {
+      // إرسال متوازي (Turbo)
+      List<Future> burst = [];
+      for (int i = 0; i < 5; i++) {
+        burst.add(InternetAddress.lookup("${i}_${secret.substring(0, 5)}.dns.local"));
+      }
+      await Future.wait(burst).catchError((e) => []);
+    }
+    
+    setState(() => _load = 0.0);
+    _msgCon.clear();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("TURBO TUNNEL: $_status"), backgroundColor: Colors.black),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (_speed > 0) CircularProgressIndicator(value: _speed, color: Colors.cyanAccent, strokeWidth: 10),
-            const SizedBox(height: 30),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.bolt),
-              label: const Text("FAST SEND (10x Speed)"),
-              onPressed: () => _sendTurbo("TEST_DATA_STREAM_MAX_SPEED_V2_2026"),
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.cyanAccent, foregroundColor: Colors.black),
-            )
-          ],
-        ),
+      appBar: AppBar(
+        title: const Text("CARDIA ULTIMATE", style: TextStyle(fontSize: 14)),
+        actions: [
+          const Icon(Icons.bolt, size: 16),
+          Switch(value: _isTunneling, activeColor: Colors.magentaAccent, onChanged: (v) => setState(() => _isTunneling = v)),
+        ],
+      ),
+      body: Column(
+        children: [
+          if (_load > 0) const LinearProgressIndicator(color: Colors.cyanAccent),
+          Expanded(child: _buildChatList()),
+          _buildInputBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatList() {
+    return ListView.builder(
+      reverse: true,
+      itemCount: _messages.length,
+      itemBuilder: (context, i) {
+        final m = _messages[i];
+        return Align(
+          alignment: m['isMe'] ? Alignment.centerRight : Alignment.centerLeft,
+          child: Container(
+            margin: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              border: Border.all(color: _isTunneling ? Colors.magentaAccent : Colors.cyanAccent, width: 0.5),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Text(m['msg']),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInputBar() {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      color: Colors.black,
+      child: Row(
+        children: [
+          IconButton(icon: const Icon(Icons.attach_file), onPressed: () {}),
+          Expanded(
+            child: TextField(
+              controller: _msgCon,
+              decoration: const InputDecoration(hintText: "Type via Tunnel...", border: InputBorder.none),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.send, color: Colors.cyanAccent),
+            onPressed: () => _sendData(_msgCon.text),
+          ),
+        ],
       ),
     );
   }
