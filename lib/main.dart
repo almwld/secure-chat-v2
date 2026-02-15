@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'dart:async';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import 'security.dart';
@@ -13,130 +14,153 @@ class CardiaHybridApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: const Color(0xFF050505)),
-      home: const HybridChatScreen(),
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF050505),
+        primaryColor: Colors.cyanAccent,
+      ),
+      home: const MeshChatScreen(),
     );
   }
 }
 
-class HybridChatScreen extends StatefulWidget {
-  const HybridChatScreen({super.key});
+class MeshChatScreen extends StatefulWidget {
+  const MeshChatScreen({super.key});
   @override
-  State<HybridChatScreen> createState() => _HybridChatScreenState();
+  State<MeshChatScreen> createState() => _MeshChatScreenState();
 }
 
-class _HybridChatScreenState extends State<HybridChatScreen> {
+class _MeshChatScreenState extends State<MeshChatScreen> {
   final EncryptionService _enc = EncryptionService();
   final TextEditingController _con = TextEditingController();
   List<Map<String, dynamic>> _messages = [];
+  List<String> _nearbyNodes = []; // قائمة الجيران المكتشفين
+  bool _isScanning = false;
   late SharedPreferences _prefs;
 
   @override
   void initState() {
     super.initState();
-    _initStorage();
+    _initApp();
   }
 
-  _initStorage() async {
+  _initApp() async {
     _prefs = await SharedPreferences.getInstance();
     _loadMessages();
+    _startRadar();
+  }
+
+  // تشغيل رادار البحث عن جيران (محاكاة P2P Discovery)
+  _startRadar() {
+    setState(() => _isScanning = true);
+    Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (mounted) {
+        setState(() {
+          // محاكاة اكتشاف جهاز قريب عند الاتصال بنفس الميكروتيك
+          if (_nearbyNodes.length < 3) {
+            _nearbyNodes.add("Node-${const Uuid().v4().substring(0, 4)}");
+          }
+        });
+      }
+    });
   }
 
   _loadMessages() {
-    String? data = _prefs.getString('dtn_queue');
+    String? data = _prefs.getString('mesh_db');
     if (data != null) {
       setState(() => _messages = List<Map<String, dynamic>>.from(json.decode(data)));
     }
   }
 
-  _processMessage() async {
+  _sendMessage() async {
     if (_con.text.isEmpty) return;
 
-    final newMessage = {
+    final msg = {
       'id': const Uuid().v4(),
       'text': _enc.encrypt(_con.text),
       'time': DateFormat('HH:mm').format(DateTime.now()),
-      'status': 'Stored', // Stored -> In-Transit -> Delivered
-      'type': 'outgoing'
+      'status': _nearbyNodes.isEmpty ? 'Stored' : 'Relayed',
+      'from': 'Me'
     };
 
-    setState(() => _messages.insert(0, newMessage));
+    setState(() => _messages.insert(0, msg));
     _con.clear();
-    await _prefs.setString('dtn_queue', json.encode(_messages));
-    
-    // محاكاة البحث عن "مسافر" أو "شبكة DNS" بعد ثوانٍ
-    Future.delayed(const Duration(seconds: 4), () {
-      _simulateTransport(newMessage['id']!);
-    });
-  }
-
-  _simulateTransport(String id) async {
-    int index = _messages.indexWhere((m) => m['id'] == id);
-    if (index != -1) {
-      setState(() => _messages[index]['status'] = 'In-Transit');
-      await _prefs.setString('dtn_queue', json.encode(_messages));
-    }
+    await _prefs.setString('mesh_db', json.encode(_messages));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("CARDIA HYBRID", style: TextStyle(letterSpacing: 2, fontWeight: FontWeight.w900)),
-        backgroundColor: Colors.transparent,
-        actions: [
-          const Icon(Icons.router, color: Colors.orangeAccent), // رمز الـ DNS Tunneling
-          const SizedBox(width: 15),
-        ],
+        title: const Text("CARDIA MESH", style: TextStyle(letterSpacing: 2, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.black,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(40),
+          child: _buildRadarBar(),
+        ),
       ),
       body: Column(
         children: [
-          Expanded(child: _buildList()),
+          Expanded(child: _buildChatList()),
           _buildInput(),
         ],
       ),
     );
   }
 
-  Widget _buildList() {
+  Widget _buildRadarBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+      color: Colors.cyanAccent.withOpacity(0.05),
+      child: Row(
+        children: [
+          Icon(Icons.radar, size: 16, color: _isScanning ? Colors.cyanAccent : Colors.grey),
+          const SizedBox(width: 10),
+          Text(
+            _nearbyNodes.isEmpty ? "Scanning for nodes..." : "${_nearbyNodes.length} Nodes Nearby",
+            style: TextStyle(fontSize: 12, color: Colors.cyanAccent.withOpacity(0.7)),
+          ),
+          const Spacer(),
+          if (_nearbyNodes.isNotEmpty)
+            const Icon(Icons.compare_arrows, size: 16, color: Colors.greenAccent),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatList() {
     return ListView.builder(
       reverse: true,
-      physics: const BouncingScrollPhysics(),
       itemCount: _messages.length,
       itemBuilder: (context, i) {
-        var msg = _messages[i];
-        String plain = _enc.decrypt(msg['text']);
-        return _chatBubble(plain, msg['time'], msg['status']);
+        var m = _messages[i];
+        bool isMe = m['from'] == 'Me';
+        return _bubble(_enc.decrypt(m['text']), isMe, m['status'], m['time']);
       },
     );
   }
 
-  Widget _chatBubble(String text, String time, String status) {
-    Color statusColor = status == 'Stored' ? Colors.grey : (status == 'In-Transit' ? Colors.orangeAccent : Colors.greenAccent);
-    
+  Widget _bubble(String text, bool isMe, String status, String time) {
     return Align(
-      alignment: Alignment.centerRight,
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(15).copyWith(bottomRight: Radius.zero),
-          border: Border.all(color: statusColor.withOpacity(0.3)),
+          color: isMe ? Colors.cyanAccent.withOpacity(0.1) : Colors.white10,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: status == 'Relayed' ? Colors.greenAccent.withOpacity(0.3) : Colors.white10),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(text, style: const TextStyle(color: Colors.white, fontSize: 16)),
-            const SizedBox(height: 5),
+            Text(text, style: const TextStyle(color: Colors.white)),
+            const SizedBox(height: 4),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(time, style: const TextStyle(fontSize: 10, color: Colors.white38)),
+                Text(time, style: const TextStyle(fontSize: 9, color: Colors.white38)),
                 const SizedBox(width: 5),
-                Icon(status == 'Stored' ? Icons.access_time : Icons.directions_bus, size: 10, color: statusColor),
-                const SizedBox(width: 3),
-                Text(status, style: TextStyle(fontSize: 9, color: statusColor, fontWeight: FontWeight.bold)),
+                Icon(status == 'Relayed' ? Icons.done_all : Icons.timer, size: 10, color: Colors.white38),
               ],
             ),
           ],
@@ -147,24 +171,24 @@ class _HybridChatScreenState extends State<HybridChatScreen> {
 
   Widget _buildInput() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(15),
+      color: Colors.black,
       child: Row(
         children: [
           Expanded(
             child: TextField(
               controller: _con,
               decoration: InputDecoration(
-                hintText: "Send via Hybrid Link...",
-                fillColor: Colors.white.withOpacity(0.05),
+                hintText: "Broadcast to Mesh...",
                 filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          CircleAvatar(
-            backgroundColor: Colors.cyanAccent,
-            child: IconButton(icon: const Icon(Icons.send, color: Colors.black), onPressed: _processMessage),
+          IconButton(
+            icon: const Icon(Icons.send, color: Colors.cyanAccent),
+            onPressed: _sendMessage,
           ),
         ],
       ),
