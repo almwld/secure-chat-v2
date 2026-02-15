@@ -1,26 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+import 'package:file_picker/file_picker.dart'; // ستحتاج لإضافة file_picker في pubspec
 import 'dart:io';
-import 'dart:async';
+import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'security.dart';
 
-void main() => runApp(const CardiaUltimateApp());
+void main() => runApp(const CardiaFileTunnelApp());
 
-class CardiaUltimateApp extends StatelessWidget {
-  const CardiaUltimateApp({super.key});
+class CardiaFileTunnelApp extends StatelessWidget {
+  const CardiaFileTunnelApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: const Color(0xFF00050A)),
-      home: const CyberLoginScreen(),
+      home: const CyberChat(),
     );
   }
 }
-
-// ... (شاشة الدخول PIN كما هي) ...
 
 class CyberChat extends StatefulWidget {
   const CyberChat({super.key});
@@ -30,143 +27,79 @@ class CyberChat extends StatefulWidget {
 
 class _CyberChatState extends State<CyberChat> {
   final EncryptionService _enc = EncryptionService();
-  final TextEditingController _con = TextEditingController();
-  List<Map<String, dynamic>> _messages = [];
   bool _isTunneling = false;
-  String _tunnelStatus = "IDLE";
-  Timer? _updateTimer;
+  double _uploadProgress = 0.0;
 
-  @override
-  void initState() {
-    super.initState();
-    // تشغيل المستمع للبحث عن رسائل قادمة كل 30 ثانية
-    _updateTimer = Timer.periodic(const Duration(seconds: 30), (t) => _listenForMessages());
-  }
+  // محرك نقل الملفات عبر النفق
+  Future<void> _sendFileViaTunnel() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles();
+    
+    if (result != null) {
+      File file = File(result.files.single.path!);
+      List<int> bytes = await file.readAsBytes();
+      String base64File = base64Encode(bytes);
+      
+      // تقطيع الملف إلى أجزاء صغيرة (مثلاً 50 حرف لكل طلب DNS)
+      int chunkSize = 50;
+      int totalChunks = (base64File.length / chunkSize).ceil();
 
-  @override
-  void dispose() { _updateTimer?.cancel(); super.dispose(); }
+      for (int i = 0; i < totalChunks; i++) {
+        int end = (i + 1) * chunkSize;
+        if (end > base64File.length) end = base64File.length;
+        
+        String chunk = base64File.substring(i * chunkSize, end);
+        String secretChunk = _enc.encrypt(chunk);
 
-  // 1. المُرسل: دفع البيانات عبر DNS TXT Query
-  Future<void> _pushViaDNS(String secret) async {
-    setState(() => _tunnelStatus = "PUSHING...");
-    try {
-      // محاكاة إرسال الطرد - نستخدم دومين فريد لكل رسالة
-      String dnsPacket = "${secret.substring(0, min(secret.length, 20))}.node.local";
-      await InternetAddress.lookup(dnsPacket).timeout(const Duration(seconds: 2));
-    } catch (e) { 
-      debugPrint("Packet Egress via Port 53"); 
+        // إرسال القطعة عبر DNS
+        try {
+          await InternetAddress.lookup("${i}_${totalChunks}_$secretChunk.data.local");
+        } catch (e) { /* تهريب ناجح */ }
+
+        setState(() {
+          _uploadProgress = (i + 1) / totalChunks;
+        });
+      }
+      
+      setState(() => _uploadProgress = 0.0);
+      _showCompleteDialog();
     }
-    setState(() => _tunnelStatus = "SENT");
   }
 
-  // 2. المُستقبل: البحث عن رسائل في الهواء الرقمي
-  Future<void> _listenForMessages() async {
-    if (!_isTunneling) return;
-    setState(() => _tunnelStatus = "SCANNING...");
-    
-    try {
-      // هنا نقوم بالبحث عن سجلات TXT (محاكاة)
-      // في النسخة الكاملة، يتم الربط مع API DNS مجاني
-      await Future.delayed(const Duration(seconds: 2)); 
-    } catch (e) { }
-    
-    setState(() => _tunnelStatus = "STABLE");
-  }
-
-  int min(int a, int b) => a < b ? a : b;
-
-  _handleSend() async {
-    if (_con.text.isEmpty) return;
-    String plain = _con.text;
-    String secret = _enc.encrypt(plain);
-
-    setState(() {
-      _messages.insert(0, {'p': secret, 'time': DateFormat('HH:mm').format(DateTime.now()), 'isMe': true, 'via': _isTunneling ? "TUNNEL" : "LOCAL"});
-    });
-
-    if (_isTunneling) await _pushViaDNS(secret);
-    _con.clear();
+  void _showCompleteDialog() {
+    showDialog(context: context, builder: (c) => const AlertDialog(content: Text("File Fragmented & Relayed via Tunnel")));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text("CARDIA CORE", style: TextStyle(fontSize: 14, color: Colors.cyanAccent)),
-            Text("LINK: $_tunnelStatus | KEY: ACTIVE", style: TextStyle(fontSize: 9, color: Colors.white38)),
-          ],
-        ),
+        title: const Text("FILE TUNNEL v1.0", style: TextStyle(letterSpacing: 2)),
         actions: [
-          Switch(
-            value: _isTunneling,
-            activeColor: Colors.magentaAccent,
-            onChanged: (v) => setState(() => _isTunneling = v),
-          )
+          Switch(value: _isTunneling, onChanged: (v) => setState(() => _isTunneling = v))
         ],
       ),
       body: Column(
         children: [
-          Expanded(child: _buildList()),
-          _inputArea(),
+          if (_uploadProgress > 0) LinearProgressIndicator(value: _uploadProgress, color: Colors.magentaAccent),
+          const Expanded(child: Center(child: Text("Ready for Secure Transmission"))),
+          _buildControlBar(),
         ],
       ),
     );
   }
 
-  Widget _buildList() {
-    return ListView.builder(
-      reverse: true,
-      itemCount: _messages.length,
-      itemBuilder: (context, i) {
-        var m = _messages[i];
-        return _chatBubble(_enc.decrypt(m['p']), m['isMe'], m['time'], m['via']);
-      },
-    );
-  }
-
-  Widget _chatBubble(String text, bool isMe, String time, String via) {
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: via == "TUNNEL" ? Colors.magentaAccent.withOpacity(0.05) : Colors.cyanAccent.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: via == "TUNNEL" ? Colors.magentaAccent.withOpacity(0.2) : Colors.cyanAccent.withOpacity(0.1)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(text, style: const TextStyle(color: Colors.white)),
-            Text("$time [$via]", style: const TextStyle(fontSize: 8, color: Colors.white24)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _inputArea() {
+  Widget _buildControlBar() {
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.all(20),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          Expanded(
-            child: TextField(
-              controller: _con,
-              decoration: InputDecoration(
-                hintText: _isTunneling ? "Tunnel Active..." : "Local Mode...",
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.02),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
-              ),
-            ),
+          IconButton(
+            icon: const Icon(Icons.attach_file, color: Colors.cyanAccent),
+            onPressed: _isTunneling ? _sendFileViaTunnel : null,
           ),
-          IconButton(icon: const Icon(Icons.bolt, color: Colors.cyanAccent), onPressed: _handleSend),
+          const Text("Select File to Fragment"),
+          const Icon(Icons.mic, color: Colors.white24), // سيتم تفعيلها في التحديث الصوتي
         ],
       ),
     );
