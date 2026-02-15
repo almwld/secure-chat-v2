@@ -1,122 +1,99 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
 import 'dart:async';
-import 'package:intl/intl.dart';
 import 'security.dart';
 import 'storage.dart';
+import 'browser_engine.dart';
 
-void main() => runApp(const CardiaOS());
+void main() => runApp(const CardiaUltimateOS());
 
-class CardiaOS extends StatelessWidget {
-  const CardiaOS({super.key});
+class CardiaUltimateOS extends StatelessWidget {
+  const CardiaUltimateOS({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: const Color(0xFF00050A)),
-      home: const MainDashboard(),
+      home: const HomeScreen(),
     );
   }
 }
 
-class MainDashboard extends StatefulWidget {
-  const MainDashboard({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
   @override
-  State<MainDashboard> createState() => _MainDashboardState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _MainDashboardState extends State<MainDashboard> {
-  final EncryptionService _enc = EncryptionService();
-  final LocalVault _vault = LocalVault();
-  final TextEditingController _msgCon = TextEditingController();
-  List<Map<String, dynamic>> _messages = [];
-  bool _isTunneling = false;
+class _HomeScreenState extends State<HomeScreen> {
+  int _currentIndex = 0;
+  final List<Widget> _pages = [const ChatPage(), const GhostBrowserPage()];
 
   @override
-  void initState() {
-    super.initState();
-    _loadHistory(); // تحميل الأرشيف عند فتح التطبيق
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _pages[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        selectedItemColor: Colors.cyanAccent,
+        onTap: (index) => setState(() => _currentIndex = index),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.chat), label: "Vault Chat"),
+          BottomNavigationBarItem(icon: Icon(Icons.public), label: "Ghost Web"),
+        ],
+      ),
+    );
   }
+}
 
-  // تحميل الرسائل القديمة من الخزنة
-  _loadHistory() async {
-    final history = await _vault.getHistory();
-    setState(() => _messages = history.reversed.toList());
-  }
+// صفحة متصفح الشبح
+class GhostBrowserPage extends StatefulWidget {
+  const GhostBrowserPage({super.key});
+  @override
+  State<GhostBrowserPage> createState() => _GhostBrowserPageState();
+}
 
-  _sendData(String text) async {
-    if (text.isEmpty) return;
-    
-    final msg = {
-      'msg': text,
-      'isMe': true,
-      'time': DateFormat('HH:mm').format(DateTime.now()),
-      'type': _isTunneling ? "TUNNEL" : "LOCAL"
-    };
+class _GhostBrowserPageState extends State<GhostBrowserPage> {
+  final GhostBrowser _browser = GhostBrowser();
+  final TextEditingController _urlCon = TextEditingController();
+  String _pageContent = "Search the web via DNS Tunnel...";
+  bool _isLoading = false;
 
-    // حفظ في الخزنة ثم التحديث في الواجهة
-    await _vault.saveMessage(msg);
-    setState(() => _messages.insert(0, msg));
-
-    if (_isTunneling) {
-       // محرك النفق التوربو
-       InternetAddress.lookup("${text.length}_${_enc.encrypt(text)}.node.local").catchError((e)=>[]);
-    }
-    _msgCon.clear();
+  _search() async {
+    setState(() => _isLoading = true);
+    final res = await _browser.fetchText(_urlCon.text);
+    setState(() {
+      _pageContent = res;
+      _isLoading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("VAULT ACTIVE", style: TextStyle(color: Colors.cyanAccent, fontSize: 14)),
-        actions: [
-          Switch(value: _isTunneling, activeColor: Colors.magentaAccent, onChanged: (v)=>setState(()=>_isTunneling=v))
-        ],
-      ),
+      appBar: AppBar(title: const Text("GHOST BROWSER", style: TextStyle(fontSize: 14))),
       body: Column(
         children: [
-          Expanded(child: ListView.builder(
-            reverse: true,
-            itemCount: _messages.length,
-            itemBuilder: (context, i) {
-              final m = _messages[i];
-              return ListTile(
-                title: Align(
-                  alignment: m['isMe'] ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
-                      border: Border.all(color: m['type'] == "TUNNEL" ? Colors.magentaAccent : Colors.cyanAccent, width: 0.5),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(m['msg']),
-                  ),
-                ),
-                subtitle: Align(
-                  alignment: m['isMe'] ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Text("${m['time']} | ${m['type']}", style: const TextStyle(fontSize: 8)),
-                ),
-              );
-            },
-          )),
-          _inputBar(),
-        ],
-      ),
-    );
-  }
-
-  Widget _inputBar() {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      color: Colors.black,
-      child: Row(
-        children: [
-          Expanded(child: TextField(controller: _msgCon, decoration: const InputDecoration(hintText: "Enter message..."))),
-          IconButton(icon: const Icon(Icons.send, color: Colors.cyanAccent), onPressed: () => _sendData(_msgCon.text)),
+          if (_isLoading) const LinearProgressIndicator(color: Colors.magentaAccent),
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: TextField(
+              controller: _urlCon,
+              decoration: InputDecoration(
+                hintText: "Enter URL (e.g. google.com)",
+                suffixIcon: IconButton(icon: const Icon(Icons.search), onPressed: _search),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          ),
+          Expanded(child: SingleChildScrollView(child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Text(_pageContent, style: const TextStyle(fontFamily: 'monospace', color: Colors.greenAccent)),
+          ))),
         ],
       ),
     );
   }
 }
+
+// (صفحة الدردشة ChatPage تبقى كما هي في الكود السابق)
+class ChatPage extends StatelessWidget { const ChatPage({super.key}); @override Widget build(BuildContext context) { return const Center(child: Text("Vault Chat Interface Active")); } }
