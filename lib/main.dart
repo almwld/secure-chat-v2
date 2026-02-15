@@ -16,7 +16,7 @@ class CardiaUltimateApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF050505),
+        scaffoldBackgroundColor: const Color(0xFF020202),
       ),
       home: const RootHandler(),
     );
@@ -35,34 +35,35 @@ class _RootHandlerState extends State<RootHandler> {
   @override
   void initState() {
     super.initState();
-    _startApp();
+    _bootSystem();
   }
 
-  Future<void> _startApp() async {
+  Future<void> _bootSystem() async {
     try {
       await Firebase.initializeApp();
     } catch (e) {
-      print("System Log: Offline Mode active");
+      debugPrint("Core Sync Status: Local Cache Mode");
     }
     if (mounted) setState(() => _initialized = true);
   }
 
   @override
   Widget build(BuildContext context) {
-    return _initialized ? const ChatScreen() : _loadingScreen();
+    // شاشة التحميل تظهر فقط أثناء الربط لتجنب البياض
+    return _initialized ? const ChatScreen() : _splashScreen();
   }
 
-  Widget _loadingScreen() {
-    return const Scaffold(
+  Widget _splashScreen() {
+    return Scaffold(
       body: Center(
         child: Column(
           mainAxisAlignment: MainCenterAxisAlignment.center,
           children: [
-            Icon(Icons.shield_moon, size: 100, color: Colors.cyanAccent),
-            SizedBox(height: 30),
-            CircularProgressIndicator(color: Colors.cyanAccent),
-            SizedBox(height: 20),
-            Text("SECURE BOOT...", style: TextStyle(color: Colors.cyanAccent, letterSpacing: 3)),
+            const Icon(Icons.shield_rounded, size: 90, color: Colors.cyanAccent),
+            const SizedBox(height: 25),
+            const CircularProgressIndicator(strokeWidth: 2, color: Colors.cyanAccent),
+            const SizedBox(height: 20),
+            Text("CARDIA SECURE BOOT", style: TextStyle(color: Colors.cyanAccent.withOpacity(0.6), letterSpacing: 4, fontSize: 10)),
           ],
         ),
       ),
@@ -79,27 +80,28 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final EncryptionService _enc = EncryptionService();
   final TextEditingController _con = TextEditingController();
-  final String _myID = "User_A"; // معرف ثابت مؤقتاً للربط
+  final String _myID = "User_Admin"; 
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("CardiaChat ✅", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.cyanAccent)),
-        backgroundColor: Colors.black,
+        title: const Text("CARDIA PRO", style: TextStyle(letterSpacing: 2, fontWeight: FontWeight.w900, fontSize: 18)),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [IconButton(icon: const Icon(Icons.settings), onPressed: () {})],
+        leading: const Icon(Icons.bolt, color: Colors.cyanAccent),
       ),
       body: Column(
         children: [
-          Expanded(child: _messageStream()),
-          _inputZone(),
+          Expanded(child: _buildMessageList()),
+          _buildInputArea(),
         ],
       ),
     );
   }
 
-  Widget _messageStream() {
+  Widget _buildMessageList() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance.collection('messages').orderBy('createdAt', descending: true).snapshots(),
       builder: (context, snapshot) {
@@ -107,70 +109,72 @@ class _ChatScreenState extends State<ChatScreen> {
         
         return ListView.builder(
           reverse: true,
+          padding: const EdgeInsets.all(20),
           itemCount: snapshot.data!.docs.length,
           itemBuilder: (context, index) {
             var doc = snapshot.data!.docs[index];
             bool isMe = doc['senderId'] == _myID;
             String text = _enc.decrypt(doc['text'] ?? "");
-            return _bubble(text, isMe);
+            return _messageBubble(text, isMe);
           },
         );
       },
     );
   }
 
-  Widget _bubble(String text, bool isMe) {
+  Widget _messageBubble(String text, bool isMe) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 15),
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
-          color: isMe ? Colors.cyanAccent.withOpacity(0.15) : Colors.white10,
-          borderRadius: BorderRadius.circular(20).copyWith(
-            bottomRight: isMe ? Radius.zero : const Radius.circular(20),
-            bottomLeft: isMe ? const Radius.circular(20) : Radius.zero,
+          color: isMe ? Colors.cyanAccent.withOpacity(0.12) : Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(18).copyWith(
+            bottomRight: isMe ? Radius.zero : const Radius.circular(18),
+            bottomLeft: isMe ? const Radius.circular(18) : Radius.zero,
           ),
-          border: Border.all(color: isMe ? Colors.cyanAccent.withOpacity(0.3) : Colors.white10),
+          border: Border.all(color: isMe ? Colors.cyanAccent.withOpacity(0.2) : Colors.white.withOpacity(0.05)),
         ),
-        child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 16)),
+        child: Text(text, style: const TextStyle(color: Colors.white, fontSize: 15)),
       ),
     );
   }
 
-  Widget _inputZone() {
+  Widget _buildInputArea() {
     return Container(
       padding: const EdgeInsets.all(20),
-      color: Colors.black,
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: _con,
-              decoration: InputDecoration(
-                hintText: "Enter command...",
-                filled: true,
-                fillColor: Colors.white.withOpacity(0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 15),
+                  color: Colors.white.withOpacity(0.05),
+                  child: TextField(
+                    controller: _con,
+                    decoration: const InputDecoration(hintText: "Enter Command...", border: InputBorder.none),
+                  ),
+                ),
               ),
             ),
           ),
           const SizedBox(width: 10),
-          CircleAvatar(
-            backgroundColor: Colors.cyanAccent,
-            child: IconButton(
-              icon: const Icon(Icons.send, color: Colors.black),
-              onPressed: () {
-                if (_con.text.isNotEmpty) {
-                  FirebaseFirestore.instance.collection('messages').add({
-                    'text': _enc.encrypt(_con.text),
-                    'senderId': _myID,
-                    'createdAt': FieldValue.serverTimestamp(),
-                  });
-                  _con.clear();
-                }
-              },
-            ),
+          IconButton(
+            icon: const Icon(Icons.send_rounded, color: Colors.cyanAccent),
+            onPressed: () {
+              if (_con.text.isNotEmpty) {
+                FirebaseFirestore.instance.collection('messages').add({
+                  'text': _enc.encrypt(_con.text),
+                  'senderId': _myID,
+                  'createdAt': FieldValue.serverTimestamp(),
+                });
+                _con.clear();
+              }
+            },
           ),
         ],
       ),
