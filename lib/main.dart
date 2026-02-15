@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:local_auth/local_auth.dart';
-import 'dart:io';
+import 'package:flutter/services.dart';
 
-void main() => runApp(const CardiaOS());
+void main() => runApp(const CardiaUltimate());
 
-class CardiaOS extends StatelessWidget {
-  const CardiaOS({super.key});
+class CardiaUltimate extends StatelessWidget {
+  const CardiaUltimate({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: const Color(0xFF010A01)),
+      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: const Color(0xFF000500)),
       home: const CalculatorDecoy(),
     );
   }
@@ -23,34 +22,25 @@ class CalculatorDecoy extends StatefulWidget {
 }
 
 class _CalculatorDecoyState extends State<CalculatorDecoy> {
-  String _input = "0";
-  final LocalAuthentication auth = LocalAuthentication();
-
-  Future<void> _authenticate(bool isPanic) async {
-    try {
-      bool authenticated = await auth.authenticate(
-        localizedReason: 'Secure Access Verification',
-        options: const AuthenticationOptions(biometricOnly: true),
-      );
-      if (authenticated) {
-        if (isPanic) {
-          exit(0); // هنا نضع كود المسح لاحقاً
-        } else {
-          Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const SecureTerminal()));
-        }
-      }
-    } catch (e) {
-      // في حال عدم دعم البصمة
-    }
-  }
+  String _input = "";
 
   void _onKey(String v) {
+    HapticFeedback.lightImpact(); // اهتزاز خفيف عند الضغط
     setState(() {
-      if (v == "C") _input = "0";
-      else if (_input == "0") _input = v;
-      else _input += v;
-      if (_input == "7391") _authenticate(false);
-      if (_input == "999") _authenticate(true);
+      if (v == "C") {
+        _input = "";
+      } else {
+        _input += v;
+      }
+
+      // 🔑 التحقق الفوري من الكود السري
+      if (_input == "7391") {
+        HapticFeedback.vibrate(); // اهتزاز قوي عند النجاح
+        Navigator.pushReplacement(
+          context, 
+          MaterialPageRoute(builder: (c) => const QuantumDashboard())
+        );
+      }
     });
   }
 
@@ -59,25 +49,71 @@ class _CalculatorDecoyState extends State<CalculatorDecoy> {
     return Scaffold(
       body: Column(
         children: [
-          Expanded(child: Container(alignment: Alignment.bottomRight, padding: const EdgeInsets.all(30),
-            child: Text(_input, style: const TextStyle(fontSize: 50, color: Colors.greenAccent)))),
-          _buildPad(),
+          Expanded(
+            child: Container(
+              alignment: Alignment.bottomRight,
+              padding: const EdgeInsets.all(40),
+              child: Text(
+                _input.isEmpty ? "0" : _input,
+                style: const TextStyle(fontSize: 80, color: Colors.greenAccent, fontWeight: FontWeight.w200),
+              ),
+            ),
+          ),
+          _buildKeypad(),
         ],
       ),
     );
   }
 
-  Widget _buildPad() {
-    var k = ["7","8","9","/", "4","5","6","*", "1","2","3","-", "C","0","=","+"];
-    return GridView.builder(shrinkWrap: true, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4),
-      itemCount: k.length, itemBuilder: (c, i) => TextButton(onPressed: () => _onKey(k[i]), child: Text(k[i], style: const TextStyle(fontSize: 24, color: Colors.greenAccent))));
+  Widget _buildKeypad() {
+    var keys = ["7","8","9","/", "4","5","6","*", "1","2","3","-", "C","0","=","+"];
+    return GridView.builder(
+      shrinkWrap: true,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4),
+      itemCount: keys.length,
+      itemBuilder: (c, i) => InkWell(
+        onTap: () => _onKey(keys[i]),
+        child: Center(
+          child: Text(keys[i], style: const TextStyle(fontSize: 30, color: Colors.greenAccent)),
+        ),
+      ),
+    );
   }
 }
 
-class SecureTerminal extends StatelessWidget {
-  const SecureTerminal({super.key});
+// --- واجهة لوحة التحكم (التي ظهرت في صورك) ---
+class QuantumDashboard extends StatefulWidget {
+  const QuantumDashboard({super.key});
+  @override
+  State<QuantumDashboard> createState() => _QuantumDashboardState();
+}
+
+class _QuantumDashboardState extends State<QuantumDashboard> {
+  int _tab = 0;
   @override
   Widget build(BuildContext context) {
-    return Scaffold(appBar: AppBar(title: const Text("SATELLITE LINK ACTIVE")), body: const Center(child: Text("SECURE DATA MODE")));
+    return Scaffold(
+      body: _tab == 0 ? _buildRadar() : (_tab == 1 ? _buildVault() : _buildConfig()),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _tab,
+        onTap: (i) => setState(() => _tab = i),
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.radar), label: "Radar"),
+          BottomNavigationBarItem(icon: Icon(Icons.lock), label: "Vault"),
+          BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Config"),
+        ],
+      ),
+    );
   }
+
+  Widget _buildRadar() => const Center(child: Text("SCANNING FOR NODES...", style: TextStyle(color: Colors.cyanAccent)));
+  Widget _buildVault() => ListView.builder(
+    itemCount: 5,
+    itemBuilder: (c, i) => ListTile(
+      leading: const Icon(Icons.lock_outline),
+      title: Text("Encrypted Node #$i"),
+      subtitle: const Text("Last burst: 2 mins ago"),
+    ),
+  );
+  Widget _buildConfig() => const Center(child: Text("SYSTEM PARAMETERS"));
 }
