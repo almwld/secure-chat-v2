@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:intl/intl.dart';
 import 'security.dart';
 
-void main() => runApp(const CardiaCyberApp());
+void main() => runApp(const CardiaUltimateApp());
 
-class CardiaCyberApp extends StatelessWidget {
-  const CardiaCyberApp({super.key});
+class CardiaUltimateApp extends StatelessWidget {
+  const CardiaUltimateApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -19,7 +20,7 @@ class CardiaCyberApp extends StatelessWidget {
   }
 }
 
-// ... (شاشة الدخول كما هي في الكود السابق) ...
+// ... (شاشة الدخول PIN كما هي) ...
 
 class CyberChat extends StatefulWidget {
   const CyberChat({super.key});
@@ -32,47 +33,58 @@ class _CyberChatState extends State<CyberChat> {
   final TextEditingController _con = TextEditingController();
   List<Map<String, dynamic>> _messages = [];
   bool _isTunneling = false;
-  String _tunnelStatus = "Ready";
+  String _tunnelStatus = "IDLE";
+  Timer? _updateTimer;
 
-  // محرك نفق الـ DNS الفعلي
-  Future<void> _sendViaDNS(String encryptedData) async {
-    setState(() => _tunnelStatus = "Tunneling...");
-    
-    try {
-      // محاكاة إرسال الطرود عبر DNS Queries
-      // في الأنظمة المتقدمة، يتم إرسالها لـ DNS Server مخصص
-      final String fakeDomain = "${encryptedData.substring(0, 10)}.tunnel.local";
-      
-      // محاولة البحث عن العنوان (هذا الطلب سيمر عبر الميكروتيك)
-      await InternetAddress.lookup(fakeDomain).timeout(const Duration(seconds: 2));
-    } catch (e) {
-      // الخطأ هنا متوقع لأن الدومين وهمي، لكن الطلب "خرج" بالفعل من الشبكة
-      debugPrint("Packet Sent via DNS Port 53");
-    }
-
-    setState(() => _tunnelStatus = "Packet Relayed");
-    Future.delayed(const Duration(seconds: 2), () => setState(() => _tunnelStatus = "Ready"));
+  @override
+  void initState() {
+    super.initState();
+    // تشغيل المستمع للبحث عن رسائل قادمة كل 30 ثانية
+    _updateTimer = Timer.periodic(const Duration(seconds: 30), (t) => _listenForMessages());
   }
 
-  _sendMessage() async {
-    if (_con.text.isEmpty) return;
+  @override
+  void dispose() { _updateTimer?.cancel(); super.dispose(); }
+
+  // 1. المُرسل: دفع البيانات عبر DNS TXT Query
+  Future<void> _pushViaDNS(String secret) async {
+    setState(() => _tunnelStatus = "PUSHING...");
+    try {
+      // محاكاة إرسال الطرد - نستخدم دومين فريد لكل رسالة
+      String dnsPacket = "${secret.substring(0, min(secret.length, 20))}.node.local";
+      await InternetAddress.lookup(dnsPacket).timeout(const Duration(seconds: 2));
+    } catch (e) { 
+      debugPrint("Packet Egress via Port 53"); 
+    }
+    setState(() => _tunnelStatus = "SENT");
+  }
+
+  // 2. المُستقبل: البحث عن رسائل في الهواء الرقمي
+  Future<void> _listenForMessages() async {
+    if (!_isTunneling) return;
+    setState(() => _tunnelStatus = "SCANNING...");
     
+    try {
+      // هنا نقوم بالبحث عن سجلات TXT (محاكاة)
+      // في النسخة الكاملة، يتم الربط مع API DNS مجاني
+      await Future.delayed(const Duration(seconds: 2)); 
+    } catch (e) { }
+    
+    setState(() => _tunnelStatus = "STABLE");
+  }
+
+  int min(int a, int b) => a < b ? a : b;
+
+  _handleSend() async {
+    if (_con.text.isEmpty) return;
     String plain = _con.text;
     String secret = _enc.encrypt(plain);
 
     setState(() {
-      _messages.insert(0, {
-        'p': secret,
-        'time': DateFormat('HH:mm').format(DateTime.now()),
-        'isMe': true,
-        'via': _isTunneling ? "DNS" : "Local"
-      });
+      _messages.insert(0, {'p': secret, 'time': DateFormat('HH:mm').format(DateTime.now()), 'isMe': true, 'via': _isTunneling ? "TUNNEL" : "LOCAL"});
     });
 
-    if (_isTunneling) {
-      await _sendViaDNS(secret);
-    }
-
+    if (_isTunneling) await _pushViaDNS(secret);
     _con.clear();
   }
 
@@ -80,14 +92,14 @@ class _CyberChatState extends State<CyberChat> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: Colors.black,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("CARDIA PROTOCOL", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-            Text("Status: $_tunnelStatus", style: TextStyle(fontSize: 9, color: _isTunneling ? Colors.magentaAccent : Colors.cyanAccent)),
+            const Text("CARDIA CORE", style: TextStyle(fontSize: 14, color: Colors.cyanAccent)),
+            Text("LINK: $_tunnelStatus", style: TextStyle(fontSize: 9, color: Colors.white38)),
           ],
         ),
-        backgroundColor: Colors.black,
         actions: [
           Switch(
             value: _isTunneling,
@@ -98,48 +110,47 @@ class _CyberChatState extends State<CyberChat> {
       ),
       body: Column(
         children: [
-          Expanded(child: _buildMessages()),
-          _buildInput(),
+          Expanded(child: _buildList()),
+          _inputArea(),
         ],
       ),
     );
   }
 
-  Widget _buildMessages() {
+  Widget _buildList() {
     return ListView.builder(
       reverse: true,
       itemCount: _messages.length,
       itemBuilder: (context, i) {
         var m = _messages[i];
-        return _bubble(_enc.decrypt(m['p']), m['isMe'], m['time'], m['via']);
+        return _chatBubble(_enc.decrypt(m['p']), m['isMe'], m['time'], m['via']);
       },
     );
   }
 
-  Widget _bubble(String text, bool isMe, String time, String via) {
+  Widget _chatBubble(String text, bool isMe, String time, String via) {
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: via == "DNS" ? Colors.magentaAccent.withOpacity(0.05) : Colors.cyanAccent.withOpacity(0.05),
-          border: Border.all(color: via == "DNS" ? Colors.magentaAccent.withOpacity(0.2) : Colors.cyanAccent.withOpacity(0.2)),
+          color: via == "TUNNEL" ? Colors.magentaAccent.withOpacity(0.05) : Colors.cyanAccent.withOpacity(0.05),
           borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: via == "TUNNEL" ? Colors.magentaAccent.withOpacity(0.2) : Colors.cyanAccent.withOpacity(0.1)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(text, style: const TextStyle(color: Colors.white)),
-            const SizedBox(height: 5),
-            Text("$time | $via", style: const TextStyle(fontSize: 8, color: Colors.white24)),
+            Text("$time [$via]", style: const TextStyle(fontSize: 8, color: Colors.white24)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInput() {
+  Widget _inputArea() {
     return Container(
       padding: const EdgeInsets.all(15),
       child: Row(
@@ -148,14 +159,14 @@ class _CyberChatState extends State<CyberChat> {
             child: TextField(
               controller: _con,
               decoration: InputDecoration(
-                hintText: _isTunneling ? "Escaping via DNS..." : "Type message...",
+                hintText: _isTunneling ? "Tunnel Active..." : "Local Mode...",
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.02),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
               ),
             ),
           ),
-          IconButton(icon: const Icon(Icons.send, color: Colors.cyanAccent), onPressed: _sendMessage)
+          IconButton(icon: const Icon(Icons.bolt, color: Colors.cyanAccent), onPressed: _handleSend),
         ],
       ),
     );
