@@ -13,8 +13,10 @@ workflows:
         - pattern: main
           include: true
     scripts:
-      - name: Set up local.properties
-        script: |
+      - name: Fix Android Folder & SDK
+        script: | 
+          # التأكد من وجود مجلد أندرويد وإصلاح الخصائص
+          flutter create . --platforms android
           echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
       - name: Get Flutter packages
         script: |
@@ -24,7 +26,3 @@ workflows:
           flutter build apk --release --split-per-abi
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
-    publishing:
-      email:
-        recipients:
-          - your-email@example.com # ضع بريدك هنا ليصلك الرابط عند الانتهاء
