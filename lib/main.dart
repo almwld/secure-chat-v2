@@ -1,101 +1,179 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
-import 'dart:convert';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:ui';
+import 'security.dart';
 
-void main() => runApp(ApscroworldApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+  runApp(const CardiaChatApp());
+}
 
-class ApscroworldApp extends StatelessWidget {
+class CardiaChatApp extends StatelessWidget {
+  const CardiaChatApp({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'CardiaChat',
       debugShowCheckedModeBanner: false,
-      title: 'Apscroworld',
-      // --- الثيم المحدث ليطابق اللوجو (الدرع والتقنية) ---
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        primaryColor: const Color(0xFF00C853), // أخضر زمردي نيون
-        scaffoldBackgroundColor: Colors.black,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF00C853),
-          brightness: Brightness.dark,
-          primary: const Color(0xFF00C853),
-          secondary: const Color(0xFFFFD700), // ذهبي (تناسقاً مع الدرع)
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black,
-          elevation: 0,
-          centerTitle: false,
-          titleTextStyle: TextStyle(color: Color(0xFF00C853), fontSize: 24, fontWeight: FontWeight.bold),
-        ),
-      ),
-      home: MainNavigation(),
+      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: Colors.black),
+      home: const UserHandler(),
     );
   }
 }
 
-class MainNavigation extends StatefulWidget {
+class UserHandler extends StatefulWidget {
+  const UserHandler({super.key});
   @override
-  _MainNavigationState createState() => _MainNavigationState();
+  State<UserHandler> createState() => _UserHandlerState();
 }
 
-class _MainNavigationState extends State<MainNavigation> {
-  int _selectedIndex = 0;
+class _UserHandlerState extends State<UserHandler> {
+  String? userId;
+  String? userImage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    String? id = prefs.getString('uid');
+    if (id == null) {
+      id = "User_${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}";
+      await prefs.setString('uid', id);
+    }
+    // رابط صورة افتراضي (يمكن تغييره لاحقاً)
+    String img = prefs.getString('uimg') ?? "https://ui-avatars.com/api/?name=$id&background=random";
+    setState(() {
+      userId = id;
+      userImage = img;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (userId == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return CardiaHome(uid: userId!, uimg: userImage!);
+  }
+}
+
+class CardiaHome extends StatefulWidget {
+  final String uid;
+  final String uimg;
+  const CardiaHome({super.key, required this.uid, required this.uimg});
+  @override
+  State<CardiaHome> createState() => _CardiaHomeState();
+}
+
+class _CardiaHomeState extends State<CardiaHome> {
+  final EncryptionService _enc = EncryptionService();
+  final TextEditingController _con = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("APSCROWORLD"),
-        actions: [
-          IconButton(icon: const Icon(Icons.shield_outlined, color: Color(0xFFFFD700)), onPressed: () {}), // أيقونة الدرع الذهبي
-          IconButton(icon: const Icon(Icons.search), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.more_vert), onPressed: () {}),
-        ],
-      ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          _buildChatList(),
-          const Center(child: Text("المستجدات الآمنة")),
-          const Center(child: Text("مجتمعات الدرع")),
-          const Center(child: Text("المكالمات المشفرة")),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
         backgroundColor: Colors.black,
-        indicatorColor: const Color(0xFF00C853).withOpacity(0.2),
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (i) => setState(() => _selectedIndex = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.chat_bubble_outline), selectedIcon: Icon(Icons.chat_bubble, color: Color(0xFF00C853)), label: "الدردشات"),
-          NavigationDestination(icon: Icon(Icons.update), label: "المستجدات"),
-          NavigationDestination(icon: Icon(Icons.security), label: "الدرع"),
-          NavigationDestination(icon: Icon(Icons.call_outlined), label: "المكالمات"),
+        title: Row(
+          children: [
+            CircleAvatar(backgroundImage: NetworkImage(widget.uimg), radius: 18),
+            const SizedBox(width: 10),
+            Text("ID: ${widget.uid}", style: const TextStyle(fontSize: 14, color: Colors.cyanAccent)),
+          ],
+        ),
+        actions: [
+          IconButton(icon: const Icon(Icons.settings_outlined), onPressed: () {}),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(child: _messageList()),
+          _inputBar(),
         ],
       ),
     );
   }
 
-  Widget _buildChatList() {
-    return ListView(
-      children: [
-        _chatItem("نظام Apscroworld", "تم تفعيل بروتوكول الدرع بنجاح.", "الآن", true),
-        _chatItem("المطور نانو", "اللوجو الجديد مدمج في الثيم.", "3:30 م", false),
-      ],
+  Widget _messageList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('messages').orderBy('createdAt', descending: true).snapshots(),
+      builder: (context, snap) {
+        if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+        return ListView.builder(
+          reverse: true,
+          physics: const BouncingScrollPhysics(),
+          itemCount: snap.data!.docs.length,
+          itemBuilder: (context, i) {
+            var doc = snap.data!.docs[i];
+            bool isMe = doc['senderId'] == widget.uid;
+            String senderImg = doc['senderImg'] ?? "https://ui-avatars.com/api/?name=User";
+            return _chatBubble(_enc.decrypt(doc['text']), isMe, senderImg);
+          },
+        );
+      },
     );
   }
 
-  Widget _chatItem(String name, String msg, String time, bool active) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: active ? const Color(0xFFFFD700) : Colors.transparent)),
-        child: const CircleAvatar(backgroundColor: Color(0xFF1A1A1A), child: Icon(Icons.person, color: Colors.white54)),
+  Widget _chatBubble(String text, bool isMe, String img) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      child: Row(
+        mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          if (!isMe) CircleAvatar(backgroundImage: NetworkImage(img), radius: 15),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
+            decoration: BoxDecoration(
+              color: isMe ? Colors.cyanAccent.withOpacity(0.15) : Colors.white10,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Text(text, style: const TextStyle(color: Colors.white)),
+          ),
+          const SizedBox(width: 8),
+          if (isMe) CircleAvatar(backgroundImage: NetworkImage(img), radius: 15),
+        ],
       ),
-      title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-      subtitle: Text(msg, maxLines: 1),
-      trailing: Text(time, style: TextStyle(color: active ? const Color(0xFF00C853) : Colors.grey)),
+    );
+  }
+
+  Widget _inputBar() {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _con,
+              decoration: InputDecoration(
+                hintText: "Message...",
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.send, color: Colors.cyanAccent),
+            onPressed: () {
+              if (_con.text.isEmpty) return;
+              FirebaseFirestore.instance.collection('messages').add({
+                'text': _enc.encrypt(_con.text),
+                'senderId': widget.uid,
+                'senderImg': widget.uimg,
+                'createdAt': FieldValue.serverTimestamp(),
+              });
+              _con.clear();
+            },
+          )
+        ],
+      ),
     );
   }
 }
