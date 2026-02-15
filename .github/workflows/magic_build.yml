@@ -1,35 +1,41 @@
-name: Cardia Cloud Magic Build
+name: Cardia Cloud Magic Build 2026
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, master ] # سيعمل السحر عند أي تحديث للكود
+  workflow_dispatch: # يتيح لك تشغيل البناء يدوياً من موقع GitHub
 
 jobs:
-  build:
+  build_production:
+    name: "🚀 Generate Ultimate APK"
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Setup Java
-        uses: actions/setup-java@v3
+      - name: "📂 Fetching Sources"
+        uses: actions/checkout@v4
+
+      - name: "☕ Setting up Java Environment"
+        uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
-          
-      - name: Setup Flutter Cloud Engine
+
+      - name: "⚡ Initializing Flutter Magic"
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.19.0'
           channel: 'stable'
+          # نستخدم أحدث نسخة مستقرة لعام 2026
+          flutter-version: '3.22.0' 
 
-      - name: Install Dependencies
+      - name: "📦 Pulling Secret Libraries"
         run: flutter pub get
 
-      - name: Build Ultimate APK
-        run: flutter build apk --release
+      - name: "🛠️ Forging the Ultimate APK"
+        run: flutter build apk --release --split-per-abi
 
-      - name: Upload Magic APK
-        uses: actions/upload-artifact@v3
+      - name: "🎁 Delivering the Magic APK"
+        uses: actions/upload-artifact@v4
         with:
-          name: Cardia-Ultimate-Quantum
+          name: Cardia-Ultimate-v2026
           path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7 # سيبقى الملف متاحاً للتحميل لمدة 7 أيام
