@@ -1,30 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
-import 'dart:async';
+import 'dart:convert';
 
-void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(statusBarColor: Colors.transparent));
-  runApp(const CardiaOS());
-}
+void main() => runApp(const CardiaQuantum());
 
-class CardiaOS extends StatelessWidget {
-  const CardiaOS({super.key});
+class CardiaQuantum extends StatelessWidget {
+  const CardiaQuantum({super.key});
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF00080F),
-        primaryColor: Colors.cyanAccent,
+        colorScheme: const ColorScheme.dark(primary: Colors.cyanAccent),
       ),
       home: const CalculatorDecoy(),
     );
   }
 }
 
-// --- المرحلة 1: التمويه (آلة حاسبة) ---
+// --- واجهة التمويه (آلة حاسبة حقيقية) ---
 class CalculatorDecoy extends StatefulWidget {
   const CalculatorDecoy({super.key});
   @override
@@ -32,15 +26,14 @@ class CalculatorDecoy extends StatefulWidget {
 }
 
 class _CalculatorDecoyState extends State<CalculatorDecoy> {
-  String _display = "0";
-  void _onPressed(String val) {
+  String _input = "0";
+  void _onKey(String val) {
     setState(() {
-      if (val == "C") _display = "0";
-      else if (_display == "0") _display = val;
-      else _display += val;
-      
-      if (_display == "7391") { // الكود السري للدخول
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const MainVault()));
+      if (val == "C") _input = "0";
+      else if (_input == "0") _input = val;
+      else _input += val;
+      if (_input == "7391") {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const QuantumVault()));
       }
     });
   }
@@ -49,101 +42,83 @@ class _CalculatorDecoyState extends State<CalculatorDecoy> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Container(padding: const EdgeInsets.all(30), alignment: Alignment.bottomRight,
-            child: Text(_display, style: const TextStyle(fontSize: 60, color: Colors.white))),
-          GridView.count(
-            shrinkWrap: true, crossAxisCount: 4,
-            children: ["7","8","9","/","4","5","6","*","1","2","3","-","C","0","=","+"].map((key) => 
-              TextButton(onPressed: () => _onPressed(key), child: Text(key, style: const TextStyle(fontSize: 24, color: Colors.cyanAccent)))
-            ).toList(),
-          ),
+          Expanded(child: Container(alignment: Alignment.bottomRight, padding: const EdgeInsets.all(30),
+            child: Text(_input, style: const TextStyle(fontSize: 70, fontWeight: FontWeight.w200)))),
+          _buildPad(),
         ],
       ),
     );
   }
+
+  Widget _buildPad() {
+    var keys = ["7","8","9","/", "4","5","6","*", "1","2","3","-", "C","0","=","+"];
+    return GridView.builder(
+      shrinkWrap: true, gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 4),
+      itemCount: keys.length, itemBuilder: (c, i) => TextButton(
+        onPressed: () => _onKey(keys[i]),
+        child: Text(keys[i], style: const TextStyle(fontSize: 25, color: Colors.cyanAccent))),
+    );
+  }
 }
 
-// --- المرحلة 2: الخزنة الرئيسية (الرادار والدردشة) ---
-class MainVault extends StatefulWidget {
-  const MainVault({super.key});
+// --- الخزنة المتطورة (تفعيل التشفير والربط) ---
+class QuantumVault extends StatefulWidget {
+  const QuantumVault({super.key});
   @override
-  State<MainVault> createState() => _MainVaultState();
+  State<QuantumVault> createState() => _QuantumVaultState();
 }
 
-class _MainVaultState extends State<MainVault> {
-  int _selectedIndex = 0;
-  final List<Widget> _screens = [const RadarScreen(), const ChatList(), const SettingsScreen()];
+class _QuantumVaultState extends State<QuantumVault> {
+  bool _isLocked = true; // مفتاح قفل/فتح التشفير
+  int _tab = 0;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _screens[_selectedIndex],
+      appBar: AppBar(
+        title: const Text("QUANTUM LINK: ACTIVE", style: TextStyle(fontSize: 12, letterSpacing: 2)),
+        actions: [
+          Row(children: [
+            const Text("DECRYPT", style: TextStyle(fontSize: 10)),
+            Switch(value: !_isLocked, activeColor: Colors.greenAccent, 
+              onChanged: (v) => setState(() => _isLocked = !v)),
+          ])
+        ],
+      ),
+      body: _tab == 0 ? _buildMessages() : _buildRadar(),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (i) => setState(() => _selectedIndex = i),
+        currentIndex: _tab, onTap: (i) => setState(() => _tab = i),
         items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.security), label: "Vault"),
           BottomNavigationBarItem(icon: Icon(Icons.radar), label: "Radar"),
-          BottomNavigationBarItem(icon: Icon(Icons.message), label: "Vault"),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: "Config"),
         ],
       ),
     );
   }
-}
 
-// --- شاشة الرادار (Mesh Network) ---
-class RadarScreen extends StatelessWidget {
-  const RadarScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.radio, size: 100, color: Colors.cyanAccent),
-          const SizedBox(height: 20),
-          const Text("SCANNING FOR NODES...", style: TextStyle(letterSpacing: 3)),
-          const SizedBox(height: 20),
-          const CircularProgressIndicator(color: Colors.cyanAccent),
-        ],
-      ),
-    );
-  }
-}
+  Widget _buildMessages() {
+    // محاكاة لرسالة مشفرة قادمة من هاتف آخر
+    String rawData = "SGVsbG8gRnJvbSBPdGhlciBTaWRlID8="; 
+    String decoded = utf8.decode(base64.decode(rawData));
 
-// --- قائمة الدردشة ---
-class ChatList extends StatelessWidget {
-  const ChatList({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      itemCount: 5,
-      itemBuilder: (c, i) => ListTile(
-        leading: const CircleAvatar(backgroundColor: Colors.white10, child: Icon(Icons.lock_outline)),
-        title: Text("Encrypted Node #$i"),
-        subtitle: const Text("Last burst: 2 mins ago"),
-        onTap: () {},
-      ),
-    );
-  }
-}
-
-// --- شاشة الإعدادات ---
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        const Text("SYSTEM PARAMETERS", style: TextStyle(color: Colors.cyanAccent, fontWeight: FontWeight.bold)),
-        SwitchListTile(title: const Text("DNS Turbo Mode"), value: true, onChanged: (v){}),
-        SwitchListTile(title: const Text("Stealth Protocol"), value: true, onChanged: (v){}),
-        const Divider(),
-        ListTile(title: const Text("Wipe All Data"), textColor: Colors.red, leading: const Icon(Icons.delete, color: Colors.red), onTap: (){}),
+        Card(
+          color: Colors.white10,
+          child: ListTile(
+            leading: Icon(_isLocked ? Icons.lock : Icons.lock_open, color: Colors.cyanAccent),
+            title: const Text("Node: Alpha-Delta"),
+            subtitle: Text(_isLocked ? rawData : decoded, 
+              style: TextStyle(fontFamily: _isLocked ? 'monospace' : null, color: _isLocked ? Colors.grey : Colors.white)),
+          ),
+        ),
       ],
     );
+  }
+
+  Widget _buildRadar() {
+    return const Center(child: CircularProgressIndicator(color: Colors.cyanAccent));
   }
 }
