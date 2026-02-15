@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-import 'dart:convert';
 import 'dart:async';
 import 'package:intl/intl.dart';
 import 'security.dart';
+import 'storage.dart';
 
 void main() => runApp(const CardiaOS());
 
@@ -13,58 +13,12 @@ class CardiaOS extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF00050A),
-        primaryColor: Colors.cyanAccent,
-      ),
-      home: const CyberLogin(),
+      theme: ThemeData.dark().copyWith(scaffoldBackgroundColor: const Color(0xFF00050A)),
+      home: const MainDashboard(),
     );
   }
 }
 
-// 1. شاشة الدخول (Gate)
-class CyberLogin extends StatefulWidget {
-  const CyberLogin({super.key});
-  @override
-  State<CyberLogin> createState() => _CyberLoginState();
-}
-
-class _CyberLoginState extends State<CyberLogin> {
-  final TextEditingController _pin = TextEditingController();
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.security, size: 80, color: Colors.cyanAccent),
-            const SizedBox(height: 20),
-            const Text("SECURE ACCESS", style: TextStyle(letterSpacing: 4, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 40),
-            SizedBox(
-              width: 150,
-              child: TextField(
-                controller: _pin,
-                obscureText: true,
-                textAlign: TextAlign.center,
-                keyboardType: TextInputType.number,
-                style: const TextStyle(letterSpacing: 10, color: Colors.cyanAccent),
-                onChanged: (v) {
-                  if (v == "1234") Navigator.pushReplacement(context, MaterialPageRoute(builder: (c) => const MainDashboard()));
-                  if (v == "9999") _pin.clear(); // منطق المسح هنا
-                },
-                decoration: const InputDecoration(hintText: "PIN", border: OutlineInputBorder()),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// 2. لوحة التحكم الرئيسية (Dashboard)
 class MainDashboard extends StatefulWidget {
   const MainDashboard({super.key});
   @override
@@ -73,29 +27,41 @@ class MainDashboard extends StatefulWidget {
 
 class _MainDashboardState extends State<MainDashboard> {
   final EncryptionService _enc = EncryptionService();
+  final LocalVault _vault = LocalVault();
   final TextEditingController _msgCon = TextEditingController();
-  final List<Map<String, dynamic>> _messages = [];
+  List<Map<String, dynamic>> _messages = [];
   bool _isTunneling = false;
-  double _load = 0.0;
 
-  // محرك الإرسال النفقي السريع
-  Future<void> _sendData(String text) async {
-    String secret = _enc.encrypt(text);
-    setState(() {
-       _messages.insert(0, {'msg': text, 'isMe': true, 'time': DateFormat('HH:mm').format(DateTime.now())});
-       _load = 0.1;
-    });
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory(); // تحميل الأرشيف عند فتح التطبيق
+  }
+
+  // تحميل الرسائل القديمة من الخزنة
+  _loadHistory() async {
+    final history = await _vault.getHistory();
+    setState(() => _messages = history.reversed.toList());
+  }
+
+  _sendData(String text) async {
+    if (text.isEmpty) return;
+    
+    final msg = {
+      'msg': text,
+      'isMe': true,
+      'time': DateFormat('HH:mm').format(DateTime.now()),
+      'type': _isTunneling ? "TUNNEL" : "LOCAL"
+    };
+
+    // حفظ في الخزنة ثم التحديث في الواجهة
+    await _vault.saveMessage(msg);
+    setState(() => _messages.insert(0, msg));
 
     if (_isTunneling) {
-      // إرسال متوازي (Turbo)
-      List<Future> burst = [];
-      for (int i = 0; i < 5; i++) {
-        burst.add(InternetAddress.lookup("${i}_${secret.substring(0, 5)}.dns.local"));
-      }
-      await Future.wait(burst).catchError((e) => []);
+       // محرك النفق التوربو
+       InternetAddress.lookup("${text.length}_${_enc.encrypt(text)}.node.local").catchError((e)=>[]);
     }
-    
-    setState(() => _load = 0.0);
     _msgCon.clear();
   }
 
@@ -103,62 +69,52 @@ class _MainDashboardState extends State<MainDashboard> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("CARDIA ULTIMATE", style: TextStyle(fontSize: 14)),
+        title: const Text("VAULT ACTIVE", style: TextStyle(color: Colors.cyanAccent, fontSize: 14)),
         actions: [
-          const Icon(Icons.bolt, size: 16),
-          Switch(value: _isTunneling, activeColor: Colors.magentaAccent, onChanged: (v) => setState(() => _isTunneling = v)),
+          Switch(value: _isTunneling, activeColor: Colors.magentaAccent, onChanged: (v)=>setState(()=>_isTunneling=v))
         ],
       ),
       body: Column(
         children: [
-          if (_load > 0) const LinearProgressIndicator(color: Colors.cyanAccent),
-          Expanded(child: _buildChatList()),
-          _buildInputBar(),
+          Expanded(child: ListView.builder(
+            reverse: true,
+            itemCount: _messages.length,
+            itemBuilder: (context, i) {
+              final m = _messages[i];
+              return ListTile(
+                title: Align(
+                  alignment: m['isMe'] ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      border: Border.all(color: m['type'] == "TUNNEL" ? Colors.magentaAccent : Colors.cyanAccent, width: 0.5),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(m['msg']),
+                  ),
+                ),
+                subtitle: Align(
+                  alignment: m['isMe'] ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Text("${m['time']} | ${m['type']}", style: const TextStyle(fontSize: 8)),
+                ),
+              );
+            },
+          )),
+          _inputBar(),
         ],
       ),
     );
   }
 
-  Widget _buildChatList() {
-    return ListView.builder(
-      reverse: true,
-      itemCount: _messages.length,
-      itemBuilder: (context, i) {
-        final m = _messages[i];
-        return Align(
-          alignment: m['isMe'] ? Alignment.centerRight : Alignment.centerLeft,
-          child: Container(
-            margin: const EdgeInsets.all(8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              border: Border.all(color: _isTunneling ? Colors.magentaAccent : Colors.cyanAccent, width: 0.5),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Text(m['msg']),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildInputBar() {
+  Widget _inputBar() {
     return Container(
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.all(10),
       color: Colors.black,
       child: Row(
         children: [
-          IconButton(icon: const Icon(Icons.attach_file), onPressed: () {}),
-          Expanded(
-            child: TextField(
-              controller: _msgCon,
-              decoration: const InputDecoration(hintText: "Type via Tunnel...", border: InputBorder.none),
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.send, color: Colors.cyanAccent),
-            onPressed: () => _sendData(_msgCon.text),
-          ),
+          Expanded(child: TextField(controller: _msgCon, decoration: const InputDecoration(hintText: "Enter message..."))),
+          IconButton(icon: const Icon(Icons.send, color: Colors.cyanAccent), onPressed: () => _sendData(_msgCon.text)),
         ],
       ),
     );
