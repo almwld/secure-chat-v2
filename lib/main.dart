@@ -49,7 +49,7 @@ class _MainVaultState extends State<MainVault> with SingleTickerProviderStateMix
           ],
         ),
         actions: [
-          IconButton(icon: Icon(_isTurbo ? Icons.bolt : Icons.shutter_speed, color: _isTurbo ? Colors.magentaAccent : Colors.cyanAccent), 
+          IconButton(icon: Icon(_isTurbo ? Icons.bolt : Icons.shutter_speed, color: _isTurbo ? Colors.deepPurpleAccent : Colors.cyanAccent), 
           onPressed: () => setState(() => _isTurbo = !_isTurbo)),
         ],
       ),
@@ -59,7 +59,7 @@ class _MainVaultState extends State<MainVault> with SingleTickerProviderStateMix
             center: Alignment.topLeft,
             radius: 1.5,
             colors: [
-              _isTurbo ? Colors.magentaAccent.withOpacity(0.05) : Colors.cyanAccent.withOpacity(0.05),
+              _isTurbo ? Colors.deepPurpleAccent.withOpacity(0.05) : Colors.cyanAccent.withOpacity(0.05),
               Colors.transparent,
             ],
           ),
@@ -79,8 +79,8 @@ class _MainVaultState extends State<MainVault> with SingleTickerProviderStateMix
       width: 10, height: 10,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: _isTurbo ? Colors.magentaAccent : Colors.cyanAccent,
-        boxShadow: [BoxShadow(color: _isTurbo ? Colors.magentaAccent : Colors.cyanAccent, blurRadius: 10)],
+        color: _isTurbo ? Colors.deepPurpleAccent : Colors.cyanAccent,
+        boxShadow: [BoxShadow(color: _isTurbo ? Colors.deepPurpleAccent : Colors.cyanAccent, blurRadius: 10)],
       ),
     );
   }
