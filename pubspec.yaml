@@ -1,5 +1,6 @@
 name: apscroworld_app
-description: The ultimate secure messaging app - Apscroworld Edition.
+description: A new Flutter project.
+publish_to: 'none'
 version: 1.0.0+1
 
 environment:
@@ -9,19 +10,10 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.2
-  shared_preferences: ^2.2.2  # لحفظ إعدادات الخصوصية
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_launcher_icons: ^0.13.1 # مولد الأيقونات الآلي
-
-flutter_launcher_icons:
-  android: true
-  ios: true
-  image_path: "assets/logo/icon.png"
-  adaptive_icon_background: "#000000"
-  adaptive_icon_foreground: "assets/logo/icon.png"
 
 flutter:
   uses-material-design: true
